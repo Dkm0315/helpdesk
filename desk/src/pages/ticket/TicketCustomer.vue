@@ -10,16 +10,23 @@
           :actions="ticket.data._customActions"
         />
         <Button
-          v-if="ticket.data.status !== 'Closed'"
+          v-if="isRaiser && ticket.data.status !== 'Closed'"
           label="Close"
           theme="gray"
           variant="solid"
-          @click="handleClose()"
+          @click="triggerClose()"
         >
           <template #prefix>
             <Icon icon="lucide:check" />
           </template>
         </Button>
+        <Button
+          v-else-if="!isRaiser && ticket.data.status !== 'Closed'"
+          label="Request Closure"
+          theme="gray"
+          variant="subtle"
+          @click="triggerRequestClosure()"
+        />
       </template>
     </LayoutHeader>
     <div class="flex overflow-hidden h-full w-full">
@@ -75,10 +82,11 @@ import { useConfigStore } from "@/stores/config";
 import { globalStore } from "@/stores/globalStore";
 import { isContentEmpty, uploadFunction } from "@/utils";
 import { Icon } from "@iconify/vue";
-import { Breadcrumbs, Button, call, createResource, toast } from "frappe-ui";
+import { Breadcrumbs, Button, FormControl, call, createResource, toast } from "frappe-ui";
 import { computed, onMounted, onUnmounted, provide, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useTicket } from "./data";
+import { useAuthStore } from "@/stores/auth";
 import { ITicket } from "./symbols";
 import TicketCustomerTemplateFields from "./TicketCustomerTemplateFields.vue";
 import TicketConversation from "./TicketConversation.vue";
@@ -120,6 +128,7 @@ const isExpanded = ref(false);
 
 const { isMobileView } = useScreenSize();
 const { $dialog } = globalStore();
+const { userId } = useAuthStore();
 
 const send = createResource({
   url: "run_doc_method",
@@ -170,36 +179,80 @@ function updateTicket(fieldname: string, value: string) {
   });
 }
 
-function handleClose() {
-  if (showFeedback.value) {
-    showFeedbackDialog.value = true;
-  } else {
-    showConfirmationDialog();
-  }
-}
+const isRaiser = computed(() => {
+  if (!ticket.data) return false;
+  return (userId as any).value === ticket.data.raised_by;
+});
 
-function showConfirmationDialog() {
+function triggerClose() {
   $dialog({
     title: "Close Ticket",
-    message: "Are you sure you want to close this ticket?",
-    actions: [
-      {
-        label: "Confirm",
-        variant: "solid",
-        onClick(close: Function) {
-          ticket.data.status = "Closed";
-          setValue.submit(
-            { fieldname: "status", value: "Closed" },
-            {
-              onSuccess: () => {
-                toast.success("Ticket closed");
-              },
-            }
-          );
-          close();
-        },
-      },
-    ],
+    message: "Provide resolution notes before closing.",
+    actions: [],
+    render: ({ close }) => {
+      const notes = ref("");
+      return h("div", { class: "flex flex-col gap-3" }, [
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "Resolution notes",
+          modelValue: notes.value,
+          "onUpdate:modelValue": (v: string) => (notes.value = v),
+        }),
+        h(
+          Button,
+          {
+            variant: "solid",
+            label: "Confirm Close",
+            onClick: async () => {
+              await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
+                ticket_id: props.ticketId,
+                resolution_notes: notes.value || "",
+              });
+              toast.success("Ticket closed");
+              ticket.reload();
+              close();
+            },
+          },
+          {}
+        ),
+      ]);
+    },
+  });
+}
+
+function triggerRequestClosure() {
+  $dialog({
+    title: "Request Closure",
+    message: "Provide resolution notes to request closure.",
+    actions: [],
+    render: ({ close }) => {
+      const notes = ref("");
+      return h("div", { class: "flex flex-col gap-3" }, [
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "Resolution notes",
+          modelValue: notes.value,
+          "onUpdate:modelValue": (v: string) => (notes.value = v),
+        }),
+        h(
+          Button,
+          {
+            variant: "solid",
+            label: "Send Request",
+            onClick: async () => {
+              await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+                ticket_id: props.ticketId,
+                resolution_notes: notes.value || "",
+              });
+              toast.success("Closure requested");
+              ticket.reload();
+              close();
+            },
+          },
+          {}
+        ),
+      ]);
+    },
   });
 }
 

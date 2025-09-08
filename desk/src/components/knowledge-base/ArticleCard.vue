@@ -14,9 +14,6 @@
         <h5 class="text-base font-medium text-gray-800 truncate">
           {{ article.title }}
         </h5>
-        <div class="text-p-sm text-gray-600 line-clamp-2">
-          {{ article.content }}
-        </div>
       </div>
     </div>
     <!-- Avatar and published date -->

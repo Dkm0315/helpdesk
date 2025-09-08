@@ -76,6 +76,18 @@
             <LucideUser class="size-4 text-ink-gray-5 mr-2" />
           </template>
         </Link>
+        <Link
+          class="form-control w-48"
+          doctype="HD Category"
+          placeholder="Category"
+          v-model="filters.category"
+          :page-length="5"
+          :hide-me="true"
+        >
+          <template #prefix>
+            <LucideFolder class="size-4 text-ink-gray-5 mr-2" />
+          </template>
+        </Link>
       </div>
       <!-- Charts -->
       <div v-if="!loading" class="transition-all animate-fade-in duration-300">
@@ -155,6 +167,7 @@ const filters = reactive({
   period: getLastXDays(),
   agent: null,
   team: null,
+  category: null,
 });
 
 const colors = [
@@ -348,6 +361,7 @@ watch(
       to_date: newVal.period?.split(",")[1] || null,
       agent: newVal.agent || null,
       team: newVal.team || null,
+      category: newVal.category || null,
     };
 
     numberCards.update({

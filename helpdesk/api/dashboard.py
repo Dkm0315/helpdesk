@@ -24,6 +24,7 @@ def get_dashboard_data(dashboard_type, filters=None):
     to_date = filters.get("to_date") if filters else None
     team = filters.get("team") if filters else None
     agent = filters.get("agent") if filters else None
+    category = filters.get("category") if filters else None
 
     if agent == "@me":
         agent = frappe.session.user
@@ -38,6 +39,7 @@ def get_dashboard_data(dashboard_type, filters=None):
         to_date=to_date,
         team=team,
         agent=agent,
+        category=category,
     )
     conds = ""
     if _filters.team:
@@ -46,11 +48,17 @@ def get_dashboard_data(dashboard_type, filters=None):
     if _filters.agent:
         conds += f" AND JSON_SEARCH(_assign, 'one', '{_filters.agent}') IS NOT NULL"
 
+    # Filter by HD Category if present (custom field on HD Ticket)
+    if _filters.category:
+        # Support both standard field (if exists) and custom field naming
+        # Prefer custom field "custom_category" as per pw_helpdesk customization
+        conds += f" AND IFNULL(custom_category, '') = '{_filters.category}'"
+
     if dashboard_type == "number_card":
         return get_number_card_data(from_date, to_date, conds)
     elif dashboard_type == "master":
         return get_master_dashboard_data(
-            from_date, to_date, _filters.team, _filters.agent
+            from_date, to_date, _filters.team, _filters.agent, _filters.category
         )
     elif dashboard_type == "trend":
         return get_trend_data(from_date, to_date, conds)
@@ -349,7 +357,7 @@ def get_avg_feedback_score(from_date, to_date, conds=""):
     }
 
 
-def get_master_dashboard_data(from_date, to_date, team=None, agent=None):
+def get_master_dashboard_data(from_date, to_date, team=None, agent=None, category=None):
     filters = {
         "creation": ["between", [from_date, to_date]],
     }
@@ -357,6 +365,8 @@ def get_master_dashboard_data(from_date, to_date, team=None, agent=None):
         filters["agent_group"] = team
     if agent:
         filters["_assign"] = ["like", f"%{agent}%"]
+    if category:
+        filters["custom_category"] = category
     team_data = get_team_chart_data(from_date, to_date, filters)
     ticket_type_data = get_ticket_type_chart_data(from_date, to_date, filters)
     ticket_priority_data = get_ticket_priority_chart_data(from_date, to_date, filters)

@@ -49,6 +49,18 @@
             </Button>
           </template>
         </Dropdown>
+        <Button
+          v-if="isRaiser && ticket.data.status !== 'Closed'"
+          label="Close"
+          variant="solid"
+          @click="triggerClose()"
+        />
+        <Button
+          v-else-if="!isRaiser && ticket.data.status !== 'Closed'"
+          label="Request Closure"
+          variant="subtle"
+          @click="triggerRequestClosure()"
+        />
       </template>
     </LayoutHeader>
     <div v-if="ticket.data" class="flex h-full overflow-hidden">
@@ -171,6 +183,7 @@ import { socket } from "@/socket";
 import { globalStore } from "@/stores/globalStore";
 import { useTicketStatusStore } from "@/stores/ticketStatus";
 import { useUserStore } from "@/stores/user";
+import { useAuthStore } from "@/stores/auth";
 import { TabObject, TicketTab, View } from "@/types";
 import { getIcon } from "@/utils";
 import { ComputedRef } from "vue";
@@ -180,6 +193,7 @@ const router = useRouter();
 
 const ticketStatusStore = useTicketStatusStore();
 const { getUser } = useUserStore();
+const { userId } = useAuthStore();
 const { $dialog } = globalStore();
 const ticketAgentActivitiesRef = ref(null);
 const communicationAreaRef = ref(null);
@@ -260,6 +274,11 @@ const breadcrumbs = computed(() => {
     },
   });
   return items;
+});
+
+const isRaiser = computed(() => {
+  if (!ticket.data) return false;
+  return (userId as any).value === ticket.data.raised_by;
 });
 
 const handleRename = () => {
@@ -426,6 +445,78 @@ function updateTicket(fieldname: string, value: string) {
 function updateOptimistic(fieldname: string, value: string) {
   ticket.data[fieldname] = value;
   toast.success("Ticket updated");
+}
+
+function triggerClose() {
+  $dialog({
+    title: "Close Ticket",
+    message: "Provide resolution notes before closing.",
+    actions: [],
+    render: ({ close }) => {
+      const notes = ref("");
+      return h("div", { class: "flex flex-col gap-3" }, [
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "Resolution notes",
+          modelValue: notes.value,
+          "onUpdate:modelValue": (v: string) => (notes.value = v),
+        }),
+        h(
+          Button,
+          {
+            variant: "solid",
+            label: "Confirm Close",
+            onClick: async () => {
+              await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
+                ticket_id: props.ticketId,
+                resolution_notes: notes.value || "",
+              });
+              toast.success("Ticket closed");
+              ticket.reload();
+              close();
+            },
+          },
+          {}
+        ),
+      ]);
+    },
+  });
+}
+
+function triggerRequestClosure() {
+  $dialog({
+    title: "Request Closure",
+    message: "Provide resolution notes to request closure.",
+    actions: [],
+    render: ({ close }) => {
+      const notes = ref("");
+      return h("div", { class: "flex flex-col gap-3" }, [
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "Resolution notes",
+          modelValue: notes.value,
+          "onUpdate:modelValue": (v: string) => (notes.value = v),
+        }),
+        h(
+          Button,
+          {
+            variant: "solid",
+            label: "Send Request",
+            onClick: async () => {
+              await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+                ticket_id: props.ticketId,
+                resolution_notes: notes.value || "",
+              });
+              toast.success("Closure requested");
+              ticket.reload();
+              close();
+            },
+          },
+          {}
+        ),
+      ]);
+    },
+  });
 }
 
 onMounted(() => {
