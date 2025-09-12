@@ -297,6 +297,9 @@ function parseViews(views) {
 
 const customerPortalDropdown = computed(() => [
   {
+    component: markRaw(Apps),
+  },
+  {
     label: "Log out",
     icon: "log-out",
     onClick: () => authStore.logout(),
