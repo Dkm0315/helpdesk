@@ -67,6 +67,15 @@ export const slaData = ref({
   support_and_resolution: defaultSupportAndResolution,
   condition: [],
   condition_json: [],
+  // Custom fields for employee hierarchy assignment
+  custom_assign_to_direct_manager: false,
+  custom_assign_to_hod: false,
+  custom_assign_to_hrbp: false,
+  custom_assign_to_manager_of_raiser: false,
+  custom_assignment_priority: "Direct Manager First",
+  custom_fallback_team: "",
+  custom_use_assignee_holiday_list: false,
+  custom_auto_assign_team: "",
 });
 
 export const resetSlaData = () => {
@@ -87,6 +96,15 @@ export const resetSlaData = () => {
     support_and_resolution: defaultSupportAndResolution,
     condition: [],
     condition_json: [],
+    // Custom fields for employee hierarchy assignment
+    custom_assign_to_direct_manager: false,
+    custom_assign_to_hod: false,
+    custom_assign_to_hrbp: false,
+    custom_assign_to_manager_of_raiser: false,
+    custom_assignment_priority: "Direct Manager First",
+    custom_fallback_team: "",
+    custom_use_assignee_holiday_list: false,
+    custom_auto_assign_team: "",
   };
 };
 

@@ -181,6 +181,104 @@
     <div>
       <div class="flex flex-col gap-1">
         <span class="text-lg font-semibold text-ink-gray-8"
+          >Employee Hierarchy Assignment</span
+        >
+        <span class="text-p-sm text-ink-gray-6">
+          Configure automatic assignment based on employee hierarchy
+        </span>
+      </div>
+      <div class="mt-5 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Checkbox
+            label="Assign to Direct Manager"
+            :model-value="slaData.custom_assign_to_direct_manager"
+            @update:model-value="(val) => slaData.custom_assign_to_direct_manager = val"
+            class="text-ink-gray-6 text-base font-medium"
+          />
+          <Checkbox
+            label="Assign to HOD"
+            :model-value="slaData.custom_assign_to_hod"
+            @update:model-value="(val) => slaData.custom_assign_to_hod = val"
+            class="text-ink-gray-6 text-base font-medium"
+          />
+          <Checkbox
+            label="Assign to HRBP"
+            :model-value="slaData.custom_assign_to_hrbp"
+            @update:model-value="(val) => slaData.custom_assign_to_hrbp = val"
+            class="text-ink-gray-6 text-base font-medium"
+          />
+          <Checkbox
+            label="Assign to Manager of Raiser"
+            :model-value="slaData.custom_assign_to_manager_of_raiser"
+            @update:model-value="(val) => slaData.custom_assign_to_manager_of_raiser = val"
+            class="text-ink-gray-6 text-base font-medium"
+          />
+        </div>
+        
+        <div v-if="hasEmployeeAssignment" class="space-y-4 p-4 bg-gray-50 rounded-lg">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <FormControl
+              type="select"
+              size="sm"
+              variant="subtle"
+              label="Assignment Priority"
+              v-model="slaData.custom_assignment_priority"
+              :options="assignmentPriorityOptions"
+              placeholder="Select priority"
+            />
+            <FormControl
+              type="select"
+              size="sm"
+              variant="subtle"
+              label="Fallback Team"
+              v-model="slaData.custom_fallback_team"
+              :options="teamOptions"
+              placeholder="Select fallback team"
+            />
+          </div>
+          <Checkbox
+            label="Use Assignee's Holiday List"
+            :model-value="slaData.custom_use_assignee_holiday_list"
+            @update:model-value="(val) => slaData.custom_use_assignee_holiday_list = val"
+            class="text-ink-gray-6 text-base font-medium"
+          />
+          <div class="text-p-sm text-ink-gray-5 italic">
+            When enabled, SLA calculations will use the assigned employee's holiday list instead of the SLA holiday list.
+          </div>
+        </div>
+        
+        <div v-if="slaData.custom_auto_assign_team && hasEmployeeAssignment" 
+             class="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
+          <span class="font-semibold">Note:</span> Both Employee Hierarchy and Team assignment are enabled. Employee Hierarchy will take priority.
+        </div>
+      </div>
+    </div>
+    <hr class="my-8" />
+    <div>
+      <div class="flex flex-col gap-1">
+        <span class="text-lg font-semibold text-ink-gray-8"
+          >Team Assignment</span
+        >
+        <span class="text-p-sm text-ink-gray-6">
+          Configure automatic team assignment for tickets
+        </span>
+      </div>
+      <div class="mt-5">
+        <FormControl
+          type="select"
+          size="sm"
+          variant="subtle"
+          label="Auto Assign Team"
+          v-model="slaData.custom_auto_assign_team"
+          :options="teamOptions"
+          placeholder="Select a team"
+        />
+      </div>
+    </div>
+    <hr class="my-8" />
+    <div>
+      <div class="flex flex-col gap-1">
+        <span class="text-lg font-semibold text-ink-gray-8"
           >Response and resolution</span
         >
         <span class="text-p-sm text-ink-gray-6">
@@ -263,7 +361,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  createResource,
   DatePicker,
   ErrorMessage,
   FormLabel,
@@ -272,13 +369,15 @@ import {
   Switch,
   toast,
 } from "frappe-ui";
-import { inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { inject, nextTick, onMounted, onUnmounted, ref, watch, computed } from "vue";
 import SlaAssignmentConditions from "./SlaAssignmentConditions.vue";
 import SlaHolidays from "./SlaHolidays.vue";
 import SlaPriorityList from "./SlaPriorityList.vue";
 import SlaStatusList from "./SlaStatusList.vue";
 import { disableSettingModalOutsideClick } from "../settingsModal";
 import { useOnboarding } from "frappe-ui/frappe";
+import { FormControl, createResource } from "frappe-ui";
+import { getTeamsList } from "@/api/teams";
 
 const { updateOnboardingStep } = useOnboarding("helpdesk");
 
@@ -296,6 +395,25 @@ const isOldSla = ref(false);
 
 const slaPolicyList = inject<any>("slaPolicyList");
 const deskUrl = `${window.location.origin}/app/hd-service-level-agreement/${slaActiveScreen.value.data?.name}`;
+
+// Team options - will be fetched from API
+const teamOptions = ref([]);
+
+const assignmentPriorityOptions = [
+  { label: "Direct Manager First", value: "Direct Manager First" },
+  { label: "HOD First", value: "HOD First" },
+  { label: "HRBP First", value: "HRBP First" },
+  { label: "Round Robin", value: "Round Robin" },
+];
+
+const hasEmployeeAssignment = computed(() => {
+  return (
+    slaData.value.custom_assign_to_direct_manager ||
+    slaData.value.custom_assign_to_hod ||
+    slaData.value.custom_assign_to_hrbp ||
+    slaData.value.custom_assign_to_manager_of_raiser
+  );
+});
 
 const getSlaData = createResource({
   url: "helpdesk.api.sla.get_sla",
@@ -325,6 +443,15 @@ const getSlaData = createResource({
       statuses: [...pauseOn, ...fulfilledOn],
       loading: false,
       condition_json: condition_json,
+      // Add custom fields with defaults
+      custom_assign_to_direct_manager: data.custom_assign_to_direct_manager || false,
+      custom_assign_to_hod: data.custom_assign_to_hod || false,
+      custom_assign_to_hrbp: data.custom_assign_to_hrbp || false,
+      custom_assign_to_manager_of_raiser: data.custom_assign_to_manager_of_raiser || false,
+      custom_assignment_priority: data.custom_assignment_priority || "Direct Manager First",
+      custom_fallback_team: data.custom_fallback_team || "",
+      custom_use_assignee_holiday_list: data.custom_use_assignee_holiday_list || false,
+      custom_auto_assign_team: data.custom_auto_assign_team || "",
     };
     slaData.value = newData;
     slaData.value.apply_sla_for_resolution = true;
@@ -512,8 +639,27 @@ const beforeUnloadHandler = (event) => {
   event.returnValue = true;
 };
 
+// Fetch teams resource
+const teamsResource = createResource({
+  url: "helpdesk.api.team.get_list",
+  auto: true,
+  onSuccess(data) {
+    if (data && Array.isArray(data)) {
+      teamOptions.value = data.map(team => ({
+        label: typeof team === 'string' ? team : team.name,
+        value: typeof team === 'string' ? team : team.name
+      }));
+    }
+  }
+});
+
 onMounted(() => {
   addEventListener("beforeunload", beforeUnloadHandler);
+  
+  // Fetch teams if not already loaded
+  if (!teamsResource.data && !teamsResource.loading) {
+    teamsResource.fetch();
+  }
 });
 
 onUnmounted(() => {
