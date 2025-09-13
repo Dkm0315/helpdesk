@@ -142,10 +142,36 @@ def get_context(d: Document) -> dict:
     :return: Context with `doc` and safe variables
     """
     utils = get_safe_globals().get("frappe").get("utils")
-    return {
+    
+    # Get employee context if ticket has assigned user
+    employee = None
+    if hasattr(d, "_assign") and d._assign:
+        import json
+        try:
+            assignees = json.loads(d._assign) if isinstance(d._assign, str) else d._assign
+            if assignees and len(assignees) > 0:
+                user_id = assignees[0]
+                employee_data = frappe.db.get_value(
+                    "Employee", 
+                    {"user_id": user_id}, 
+                    ["name", "employee_name", "department", "designation", 
+                     "branch", "employment_type", "grade", "company", 
+                     "reports_to", "status"],
+                    as_dict=True
+                )
+                if employee_data:
+                    employee = frappe._dict(employee_data)
+        except:
+            pass
+    
+    # Build context with employee data
+    context = {
         "doc": d.as_dict(),
         "frappe": frappe._dict(utils=utils),
+        "employee": employee
     }
+    
+    return context
 
 
 def agent_only(fn):

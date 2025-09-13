@@ -106,6 +106,12 @@
       </div>
     </div>
     <ErrorMessage :message="assignmentRulesErrors.users" />
+
+    <!-- Dynamic User Assignment Section -->
+    <DynamicUserAssignmentSelector />
+
+    <!-- Holiday Lists Section -->
+    <HolidaySelector />
   </div>
 </template>
 
@@ -117,6 +123,8 @@ import {
   validateAssignmentRule,
 } from "../../../stores/assignmentRules";
 import AssigneeSearch from "./AssigneeSearch.vue";
+import DynamicUserAssignmentSelector from "./DynamicUserAssignmentSelector.vue";
+import HolidaySelector from "./HolidaySelector.vue";
 import { computed } from "vue";
 import { useUserStore } from "@/stores/user";
 

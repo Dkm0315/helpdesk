@@ -254,19 +254,29 @@ const showConfirmDialog = ref(false);
 const holidayList = inject<any>("holidayList");
 
 const getHolidayData = createResource({
-  url: "helpdesk.api.holiday_list.get_holiday_list",
+  url: "helpdesk.api.holidays.get_holiday_details",
   params: {
-    docname: holidayListActiveScreen.value.data?.name,
+    holiday_name: holidayListActiveScreen.value.data?.name,
   },
   onSuccess(data) {
-    holidayData.value = data;
-    initialData.value = JSON.stringify(data);
+    // Transform single holiday data to match the expected structure
+    const transformedData = {
+      holiday_list_name: data.holiday_name,
+      description: data.type || "",
+      from_date: data.date,
+      to_date: data.date,
+      holidays: [{
+        holiday_date: data.date,
+        description: data.holiday_name,
+        name: data.name
+      }],
+      recurring_holidays: data.repeat_next_year ? [data] : [],
+      loading: false
+    };
+    holidayData.value = transformedData;
+    initialData.value = JSON.stringify(transformedData);
   },
   transform(data) {
-    for (let holiday of data.holidays) {
-      holiday.description = htmlToText(holiday.description);
-    }
-    data.recurring_holidays = JSON.parse(data.recurring_holidays || "[]");
     return data;
   },
 });
@@ -333,62 +343,54 @@ const saveHoliday = () => {
 };
 
 const createHoliday = () => {
-  const holidays = holidayData.value.holidays.map((holiday) => {
-    return {
-      ...holiday,
-      holiday_date: dayjs(holiday.holiday_date).format("YYYY-MM-DD"),
-    };
-  });
-  holidayList.insert.submit(
-    {
-      holiday_list_name: holidayData.value.holiday_list_name,
-      description: holidayData.value.description,
-      from_date: holidayData.value.from_date,
-      to_date: holidayData.value.to_date,
-      holidays: holidays,
-      recurring_holidays: JSON.stringify(holidayData.value.recurring_holidays),
+  // For Holidays doctype, we create a single holiday record
+  const holidayDate = holidayData.value.from_date || dayjs().format("YYYY-MM-DD");
+  
+  createResource({
+    url: "helpdesk.api.holidays.create_holiday",
+    params: {
+      holiday_data: {
+        holiday_name: holidayData.value.holiday_list_name,
+        date: holidayDate,
+        type: holidayData.value.description || "National Holiday",
+        repeat_next_year: holidayData.value.recurring_holidays?.length > 0 ? 1 : 0
+      }
     },
-    {
-      onSuccess(data) {
-        toast.success("Holiday list created");
-        holidayListActiveScreen.value.data = data;
-        holidayListActiveScreen.value.screen = "view";
-        getHolidayData.submit({
-          docname: data.name,
-        });
-      },
-    }
-  );
+    onSuccess(data) {
+      toast.success("Holiday created");
+      holidayList.reload();
+      holidayListActiveScreen.value = {
+        screen: "list",
+        data: null,
+      };
+    },
+    auto: true
+  });
 };
 
 const updateHolidayResource = createResource({
-  url: "helpdesk.api.holiday_list.update_holiday_list",
+  url: "helpdesk.api.holidays.update_holiday",
   onSuccess(data) {
-    holidayListActiveScreen.value.data = data;
-    getHolidayData.submit({
-      docname: data.name,
-    });
-    toast.success("Holiday list updated");
+    toast.success("Holiday updated");
+    holidayList.reload();
+    getHolidayData.fetch();
   },
 });
 
 const updateHoliday = () => {
-  const holidays = holidayData.value.holidays.map((holiday) => {
-    return {
-      ...holiday,
-      holiday_date: dayjs(holiday.holiday_date).format("YYYY-MM-DD"),
-    };
-  });
+  // For Holidays doctype, we update a single holiday record
+  const holidayDate = holidayData.value.from_date || 
+                      (holidayData.value.holidays?.[0]?.holiday_date ? 
+                       dayjs(holidayData.value.holidays[0].holiday_date).format("YYYY-MM-DD") : 
+                       dayjs().format("YYYY-MM-DD"));
 
   updateHolidayResource.submit({
-    docname: holidayListActiveScreen.value.data.name,
-    doc: {
-      holiday_list_name: holidayData.value.holiday_list_name,
-      description: holidayData.value.description,
-      from_date: holidayData.value.from_date,
-      to_date: holidayData.value.to_date,
-      holidays: holidays,
-      recurring_holidays: JSON.stringify(holidayData.value.recurring_holidays),
+    holiday_name: holidayListActiveScreen.value.data.name,
+    holiday_data: {
+      holiday_name: holidayData.value.holiday_list_name,
+      date: holidayDate,
+      type: holidayData.value.description || "National Holiday",
+      repeat_next_year: holidayData.value.recurring_holidays?.length > 0 ? 1 : 0
     },
   });
 };

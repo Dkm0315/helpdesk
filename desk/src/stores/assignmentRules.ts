@@ -19,6 +19,8 @@ export const assignmentRuleData = ref<Record<string, any> | null>({
   rule: "Round Robin",
   priority: 1,
   users: [],
+  dynamicUserAssignments: [],
+  holidays: [],
   disabled: false,
   description: "",
   name: "",
@@ -35,6 +37,8 @@ export const resetAssignmentRuleData = () => {
     rule: "Round Robin",
     priority: 1,
     users: [],
+    dynamicUserAssignments: [],
+    holidays: [],
     disabled: false,
     description: "",
     name: "",
@@ -134,6 +138,8 @@ export const assignmentRulesErrors = ref<Record<string, any> | null>({
   assignConditionError: "",
   unassignConditionError: "",
   users: "",
+  dynamicUserAssignments: "",
+  holidays: "",
   description: "",
   assignmentDays: "",
 });
@@ -142,4 +148,49 @@ export const resetAssignmentRuleErrors = () => {
   (Object.keys(assignmentRulesErrors.value) as string[]).forEach((key) => {
     assignmentRulesErrors.value[key] = "";
   });
+};
+
+// Dynamic User Assignment related methods
+export const dynamicUserAssignmentsList = ref([]);
+export const holidaysList = ref([]);
+
+export const fetchDynamicUserAssignments = async () => {
+  try {
+    const response = await fetch('/api/method/helpdesk.api.dynamic_user_assignment.get_assignments');
+    const data = await response.json();
+    dynamicUserAssignmentsList.value = data.message || [];
+    return dynamicUserAssignmentsList.value;
+  } catch (error) {
+    console.error('Error fetching dynamic user assignments:', error);
+    return [];
+  }
+};
+
+export const fetchHolidays = async () => {
+  try {
+    const response = await fetch('/api/method/helpdesk.api.holidays.get_holidays');
+    const data = await response.json();
+    holidaysList.value = data.message || [];
+    return holidaysList.value;
+  } catch (error) {
+    console.error('Error fetching holidays:', error);
+    return [];
+  }
+};
+
+export const applyDynamicUserAssignment = async (assignmentId: string) => {
+  try {
+    const response = await fetch('/api/method/helpdesk.api.dynamic_user_assignment.apply_assignment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ assignment_id: assignmentId }),
+    });
+    const data = await response.json();
+    return data.message;
+  } catch (error) {
+    console.error('Error applying dynamic user assignment:', error);
+    return null;
+  }
 };

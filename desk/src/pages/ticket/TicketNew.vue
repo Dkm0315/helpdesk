@@ -34,6 +34,33 @@
           "
         />
       </div>
+      <!-- category and subcategory fields -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="flex flex-col gap-2">
+          <span class="block text-sm text-gray-700">
+            Category
+            <span class="place-self-center text-red-500"> * </span>
+          </span>
+          <FormControl
+            v-model="custom_category"
+            type="select"
+            :options="categoriesOptions"
+            placeholder="Select a category"
+            @change="onCategoryChange"
+          />
+        </div>
+        <div v-if="custom_category" class="flex flex-col gap-2">
+          <span class="block text-sm text-gray-700">
+            Subcategory
+          </span>
+          <FormControl
+            v-model="custom_subcategory"
+            type="select"
+            :options="subcategoriesOptions"
+            placeholder="Select a subcategory"
+          />
+        </div>
+      </div>
       <!-- existing fields -->
       <div
         class="flex flex-col"
@@ -159,6 +186,10 @@ const subject = ref("");
 const description = ref("");
 const attachments = ref([]);
 const templateFields = reactive({});
+const custom_category = ref("");
+const custom_subcategory = ref("");
+const categoriesOptions = ref([]);
+const subcategoriesOptions = ref([]);
 
 const template = createResource({
   url: "helpdesk.helpdesk.doctype.hd_ticket_template.api.get_one",
@@ -226,13 +257,15 @@ const ticket = createResource({
       description: description.value,
       subject: subject.value,
       template: props.templateId,
+      custom_category: custom_category.value,
+      custom_subcategory: custom_subcategory.value,
       ...templateFields,
     },
     attachments: attachments.value,
   }),
   validate: (params) => {
     const fields = visibleFields.value?.filter((f) => f.required) || [];
-    const toVerify = [...fields, "subject", "description"];
+    const toVerify = [...fields, "subject", "description", "custom_category"];
     for (const field of toVerify) {
       if (isEmpty(params.doc[field.fieldname || field])) {
         return `${field.label || field} is required`;
@@ -294,11 +327,44 @@ usePageMeta(() => ({
   title: "New Ticket",
 }));
 
+async function loadCategories() {
+  try {
+    const response = await call("helpdesk.api.category.get_categories");
+    categoriesOptions.value = response.map(cat => ({
+      label: cat.category_name,
+      value: cat.name
+    }));
+  } catch (error) {
+    console.error("Error loading categories:", error);
+  }
+}
+
+async function onCategoryChange() {
+  custom_subcategory.value = "";
+  subcategoriesOptions.value = [];
+  
+  if (custom_category.value) {
+    try {
+      const response = await call(
+        "helpdesk.api.category.get_subcategories",
+        { parent_category: custom_category.value }
+      );
+      subcategoriesOptions.value = response.map(sub => ({
+        label: sub.category_name,
+        value: sub.name
+      }));
+    } catch (error) {
+      console.error("Error loading subcategories:", error);
+    }
+  }
+}
+
 onMounted(() => {
   capture("new_ticket_page", {
     data: {
       user: userID,
     },
   });
+  loadCategories();
 });
 </script>

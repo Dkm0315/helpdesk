@@ -65,6 +65,11 @@ override_doctype_class = {
     "Email Account": "helpdesk.overrides.email_account.CustomEmailAccount",
 }
 
+# Client Scripts
+doctype_js = {
+    "HD Ticket": "public/js/hd_ticket_category.js"
+}
+
 ignore_links_on_delete = [
     "HD Notification",
     "HD Ticket Comment",
