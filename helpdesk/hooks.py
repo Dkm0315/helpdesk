@@ -46,6 +46,9 @@ doc_events = {
         "before_insert": "helpdesk.overrides.contact.before_insert",
     },
     "Assignment Rule": {
+        "validate": [
+            "helpdesk.helpdesk.custom.assignment_rule_custom.on_assignment_rule_apply",
+        ],
         "on_trash": "helpdesk.extends.assignment_rule.on_assignment_rule_trash",
     },
 }

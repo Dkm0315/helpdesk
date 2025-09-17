@@ -169,52 +169,96 @@ const toggleAssignment = (assignment) => {
 };
 
 const removeAssignment = (assignment) => {
-  assignmentRuleData.value.dynamicUserAssignments = 
+  // Remove the assignment
+  assignmentRuleData.value.dynamicUserAssignments =
     assignmentRuleData.value.dynamicUserAssignments.filter(
       (a) => a.name !== assignment.name
     );
+
+  // If this was the only dynamic assignment, clear custom_user_assignment
+  if (assignmentRuleData.value.dynamicUserAssignments.length === 0) {
+    assignmentRuleData.value.custom_user_assignment = null;
+  } else if (assignmentRuleData.value.custom_user_assignment === assignment.name) {
+    // If we removed the primary assignment, set a new one
+    assignmentRuleData.value.custom_user_assignment =
+      assignmentRuleData.value.dynamicUserAssignments[0].name;
+  }
+
+  // Remove users that came from this assignment
+  if (assignment.fetched_users && assignment.fetched_users.length > 0) {
+    const usersToRemove = new Set(
+      assignment.fetched_users.map(u => u.email || u.user)
+    );
+
+    // Check if these users are also in other dynamic assignments
+    const usersInOtherAssignments = new Set();
+    assignmentRuleData.value.dynamicUserAssignments.forEach((otherAssignment) => {
+      if (otherAssignment.fetched_users) {
+        otherAssignment.fetched_users.forEach(u => {
+          usersInOtherAssignments.add(u.email || u.user);
+        });
+      }
+    });
+
+    // Only remove users that aren't in other assignments
+    assignmentRuleData.value.users = assignmentRuleData.value.users.filter(
+      (user: any) => {
+        const userEmail = user.user || user.email;
+        return !usersToRemove.has(userEmail) || usersInOtherAssignments.has(userEmail);
+      }
+    );
+  }
 };
 
 const applySelections = async () => {
   // Apply each selected dynamic assignment and get users
   const allUsers = [];
   const userEmails = new Set();
-  
+
   for (const assignment of tempSelections.value) {
     const users = await applyDynamicUserAssignment(assignment.name);
     if (users && users.length > 0) {
       // Add fetched users to the assignment
       assignment.fetched_users = users;
-      
+
       // Aggregate unique users
       users.forEach(user => {
-        if (!userEmails.has(user.email || user.user)) {
-          userEmails.add(user.email || user.user);
+        const userEmail = user.email || user.user;
+        if (!userEmails.has(userEmail)) {
+          userEmails.add(userEmail);
           allUsers.push({
-            user: user.email || user.user,
+            user: userEmail,
             full_name: user.full_name,
-            email: user.email || user.user,
+            email: userEmail,
             user_image: user.user_image
           });
         }
       });
     }
   }
-  
-  // Update both dynamic assignments and users
+
+  // Update dynamic assignments
   assignmentRuleData.value.dynamicUserAssignments = [...tempSelections.value];
-  
+
+  // Store the custom_user_assignment field with the dynamic assignment IDs
+  if (tempSelections.value.length > 0) {
+    // For backward compatibility, store the first one in custom_user_assignment
+    assignmentRuleData.value.custom_user_assignment = tempSelections.value[0].name;
+  }
+
   // Add users from dynamic assignments to the users list
   if (allUsers.length > 0) {
     // Merge with existing users, avoiding duplicates
-    const existingUserEmails = new Set(assignmentRuleData.value.users.map(u => u.user));
+    const existingUserEmails = new Set(
+      assignmentRuleData.value.users.map((u: any) => u.user || u.email)
+    );
     allUsers.forEach(user => {
       if (!existingUserEmails.has(user.user)) {
         assignmentRuleData.value.users.push(user);
       }
     });
   }
-  
+
   showAssignmentModal.value = false;
   tempSelections.value = [];
 };

@@ -319,6 +319,7 @@ import {
   assignmentRuleData,
   assignmentRulesActiveScreen,
   assignmentRulesErrors,
+  defaultAssignmentDays,
   resetAssignmentRuleData,
   resetAssignmentRuleErrors,
   validateAssignmentRule,
@@ -344,27 +345,34 @@ const isOldSla = ref(false);
 const deskUrl = `${window.location.origin}/app/assignment-rule/${assignmentRulesActiveScreen.value.data?.name}`;
 
 const getAssignmentRuleData = createResource({
-  url: "frappe.client.get",
+  url: "helpdesk.api.assignment_rule.get_assignment_rule_details",
   params: {
-    doctype: "Assignment Rule",
     name: assignmentRulesActiveScreen.value.data?.name,
   },
   auto: Boolean(assignmentRulesActiveScreen.value.data),
   onSuccess(data) {
+    const assignmentDays =
+      data.assignmentDays && data.assignmentDays.length
+        ? data.assignmentDays
+        : [...defaultAssignmentDays];
+
     assignmentRuleData.value = {
       loading: false,
       assignCondition: data.assign_condition,
       unassignCondition: data.unassign_condition,
-      assignConditionJson: JSON.parse(data.assign_condition_json || "[]"),
-      unassignConditionJson: JSON.parse(data.unassign_condition_json || "[]"),
+      assignConditionJson: data.assignConditionJson || [],
+      unassignConditionJson: data.unassignConditionJson || [],
       rule: data.rule,
       priority: data.priority,
-      users: data.users,
+      users: data.users || [],
+      dynamicUserAssignments: data.dynamicUserAssignments || [],
+      holidays: data.holidays || [],
       disabled: data.disabled,
       description: data.description,
       name: data.name,
-      assignmentRuleName: data.name,
-      assignmentDays: data.assignment_days.map((day) => day.day),
+      assignmentRuleName: data.assignment_rule_name || data.name,
+      assignmentDays,
+      custom_user_assignment: data.custom_user_assignment || null,
     };
 
     initialData.value = JSON.stringify(assignmentRuleData.value);
@@ -446,58 +454,79 @@ const saveAssignmentRule = () => {
   }
 };
 
-const createAssignmentRule = () => {
-  isLoading.value = true;
-  createResource({
-    url: "frappe.client.insert",
-    params: {
-      doc: {
-        doctype: "Assignment Rule",
-        document_type: "HD Ticket",
-        rule: assignmentRuleData.value.rule,
-        priority: assignmentRuleData.value.priority,
-        users: assignmentRuleData.value.users,
-        disabled: assignmentRuleData.value.disabled,
-        description: assignmentRuleData.value.description,
-        assignment_days: assignmentRuleData.value.assignmentDays.map((day) => ({
-          day: day,
-        })),
-        name: assignmentRuleData.value.assignmentRuleName,
-        assignment_rule_name: assignmentRuleData.value.assignmentRuleName,
-        assign_condition: convertToConditions({
+const buildAssignmentRulePayload = () => {
+  const payload: Record<string, any> = {
+    name: assignmentRuleData.value.name,
+    assignmentRuleName: assignmentRuleData.value.assignmentRuleName,
+    description: assignmentRuleData.value.description,
+    disabled: assignmentRuleData.value.disabled,
+    priority: assignmentRuleData.value.priority,
+    rule: assignmentRuleData.value.rule,
+    assignCondition: useNewUI.value
+      ? convertToConditions({
           conditions: assignmentRuleData.value.assignConditionJson,
-        }),
-        unassign_condition: convertToConditions({
-          conditions: assignmentRuleData.value.unassignConditionJson,
-        }),
-        assign_condition_json: JSON.stringify(
-          assignmentRuleData.value.assignConditionJson
-        ),
-        unassign_condition_json: JSON.stringify(
-          assignmentRuleData.value.unassignConditionJson
-        ),
-      },
-    },
-    auto: true,
-    onSuccess(data) {
-      getAssignmentRuleData
-        .submit({
-          doctype: "Assignment Rule",
-          name: data.name,
         })
-        .then(() => {
-          isLoading.value = false;
-          toast.success("Assignment rule created");
-        });
-      assignmentRulesActiveScreen.value = {
-        screen: "view",
-        data: data,
-      };
-    },
-    onError: () => {
-      isLoading.value = false;
-    },
-  });
+      : assignmentRuleData.value.assignCondition,
+    unassignCondition: useNewUI.value
+      ? convertToConditions({
+          conditions: assignmentRuleData.value.unassignConditionJson,
+        })
+      : assignmentRuleData.value.unassignCondition,
+    assignmentDays: assignmentRuleData.value.assignmentDays,
+    users:
+      assignmentRuleData.value.users?.map((user) => ({
+        user: user.user || user.email || user,
+      })) || [],
+    dynamicUserAssignments:
+      assignmentRuleData.value.dynamicUserAssignments?.map((assignment) => ({
+        name: assignment.name,
+      })) || [],
+    holidays:
+      assignmentRuleData.value.holidays?.map((holiday) => ({
+        name: holiday.name,
+      })) || [],
+    custom_user_assignment: assignmentRuleData.value.custom_user_assignment,
+  };
+
+  if (useNewUI.value) {
+    payload.assignConditionJson = assignmentRuleData.value.assignConditionJson;
+    payload.unassignConditionJson =
+      assignmentRuleData.value.unassignConditionJson;
+  }
+
+  if (!payload.name) {
+    delete payload.name;
+  }
+
+  return payload;
+};
+
+const createAssignmentRule = async () => {
+  isLoading.value = true;
+  try {
+    const payload = buildAssignmentRulePayload();
+    const response = await call(
+      "helpdesk.api.assignment_rule.save_assignment_rule",
+      { data: payload }
+    );
+    const newName = response?.name || payload.assignmentRuleName;
+    assignmentRuleData.value.name = newName;
+    assignmentRuleData.value.assignmentRuleName =
+      assignmentRuleData.value.assignmentRuleName || newName;
+    assignmentRulesActiveScreen.value = {
+      screen: "view",
+      data: { name: newName },
+    };
+    await getAssignmentRuleData.submit({ name: newName });
+    toast.success("Assignment rule created");
+  } catch (er) {
+    const error =
+      er?.messages?.[0] ||
+      "Some error occurred while creating assignment rule";
+    toast.error(error);
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 const priorityOptions = [
@@ -510,71 +539,30 @@ const priorityOptions = [
 
 const updateAssignmentRule = async () => {
   isLoading.value = true;
-
-  await call("frappe.client.set_value", {
-    doctype: "Assignment Rule",
-    document_type: "HD Ticket",
-    name: assignmentRuleData.value.name,
-    fieldname: {
-      rule: assignmentRuleData.value.rule,
-      priority: assignmentRuleData.value.priority,
-      users: assignmentRuleData.value.users,
-      disabled: assignmentRuleData.value.disabled,
-      description: assignmentRuleData.value.description,
-      assignment_days: assignmentRuleData.value.assignmentDays.map((day) => ({
-        day: day,
-      })),
-      assign_condition: useNewUI.value
-        ? convertToConditions({
-            conditions: assignmentRuleData.value.assignConditionJson,
-          })
-        : assignmentRuleData.value.assignCondition,
-      unassign_condition: useNewUI.value
-        ? convertToConditions({
-            conditions: assignmentRuleData.value.unassignConditionJson,
-          })
-        : assignmentRuleData.value.unassignCondition,
-      assign_condition_json: useNewUI.value
-        ? JSON.stringify(assignmentRuleData.value.assignConditionJson)
-        : null,
-      unassign_condition_json: useNewUI.value
-        ? JSON.stringify(assignmentRuleData.value.unassignConditionJson)
-        : null,
-    },
-  }).catch((er) => {
+  try {
+    const payload = buildAssignmentRulePayload();
+    const response = await call(
+      "helpdesk.api.assignment_rule.save_assignment_rule",
+      { data: payload }
+    );
+    const updatedName = response?.name || payload.name;
+    assignmentRuleData.value.name = updatedName;
+    assignmentRuleData.value.assignmentRuleName =
+      assignmentRuleData.value.assignmentRuleName || updatedName;
+    assignmentRulesActiveScreen.value = {
+      screen: "view",
+      data: { name: updatedName },
+    };
+    await getAssignmentRuleData.submit({ name: updatedName });
+    toast.success("Assignment rule updated");
+  } catch (er) {
     const error =
-      er?.messages?.[0] || "Some error occurred while updating assignment rule";
+      er?.messages?.[0] ||
+      "Some error occurred while updating assignment rule";
     toast.error(error);
+  } finally {
     isLoading.value = false;
-  });
-
-  if (
-    assignmentRuleData.value.name !==
-    assignmentRuleData.value.assignmentRuleName
-  ) {
-    await call("frappe.client.rename_doc", {
-      doctype: "Assignment Rule",
-      old_name: assignmentRuleData.value.name,
-      new_name: assignmentRuleData.value.assignmentRuleName,
-    }).catch(async (er) => {
-      const error =
-        er?.messages?.[0] ||
-        "Some error occurred while renaming assignment rule";
-      toast.error(error);
-      // Reset assignment rule to previous state
-      await getAssignmentRuleData.reload();
-      isLoading.value = false;
-    });
-    await getAssignmentRuleData.submit({
-      doctype: "Assignment Rule",
-      name: assignmentRuleData.value.assignmentRuleName,
-    });
-  } else {
-    getAssignmentRuleData.reload();
   }
-
-  isLoading.value = false;
-  toast.success("Assignment rule updated");
 };
 
 watch(

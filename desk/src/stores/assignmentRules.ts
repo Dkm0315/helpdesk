@@ -1,7 +1,7 @@
 import { validateConditions } from "@/utils";
 import { ref } from "vue";
 
-const defaultAssignmentDays = [
+export const defaultAssignmentDays = [
   "Monday",
   "Tuesday",
   "Wednesday",
@@ -26,6 +26,7 @@ export const assignmentRuleData = ref<Record<string, any> | null>({
   name: "",
   assignmentRuleName: "",
   assignmentDays: defaultAssignmentDays,
+  custom_user_assignment: null,
 });
 
 export const resetAssignmentRuleData = () => {
@@ -44,6 +45,7 @@ export const resetAssignmentRuleData = () => {
     name: "",
     assignmentRuleName: "",
     assignmentDays: defaultAssignmentDays,
+    custom_user_assignment: null,
   };
 };
 
@@ -105,10 +107,15 @@ export const validateAssignmentRule = (
         }
         break;
       case "users":
+        // Users are required unless dynamic user assignments are present
+        const hasDynamicAssignments =
+          assignmentRuleData.value.dynamicUserAssignments?.length > 0;
+        const hasUsers = assignmentRuleData.value.users?.length > 0;
+
         assignmentRulesErrors.value.users =
-          assignmentRuleData.value.users?.length > 0
+          (hasUsers || hasDynamicAssignments)
             ? ""
-            : "Users are required";
+            : "Users or Dynamic User Assignments are required";
         break;
       case "assignmentDays":
         assignmentRulesErrors.value.assignmentDays =

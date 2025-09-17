@@ -1,5 +1,9 @@
-import frappe
 import json
+
+import frappe
+from frappe import _
+
+from helpdesk.api.dynamic_user_assignment import get_users_for_assignment
 
 
 @frappe.whitelist()
@@ -38,47 +42,50 @@ def get_assignment_rule_details(name):
     """Get detailed assignment rule with all fields"""
     try:
         doc = frappe.get_doc("Assignment Rule", name)
-        
-        # Convert to dict and include custom fields
+
         rule_data = doc.as_dict()
-        
-        # Ensure users are properly formatted
-        if doc.users:
-            rule_data["users"] = [{"user": user.user} for user in doc.users]
-        
-        # Get associated Dynamic User Assignment if exists
-        if hasattr(doc, "custom_user_assignment") and doc.custom_user_assignment:
-            try:
-                dynamic_assignment = frappe.get_doc("Dynamic User Assignment", doc.custom_user_assignment)
-                rule_data["dynamicUserAssignments"] = [{
-                    "name": dynamic_assignment.name,
-                    "assignment_name": dynamic_assignment.assignment_name,
-                    "users": [{"user": u.user} for u in dynamic_assignment.users]
-                }]
-            except:
-                rule_data["dynamicUserAssignments"] = []
-        else:
-            rule_data["dynamicUserAssignments"] = []
-        
-        # Get associated holidays
-        rule_data["holidays"] = []
-        if hasattr(doc, "custom_holiday_lists"):
-            # Parse holiday lists if stored as JSON string
-            if isinstance(doc.custom_holiday_lists, str):
-                try:
-                    holiday_names = json.loads(doc.custom_holiday_lists)
-                    for holiday_name in holiday_names:
-                        rule_data["holidays"].append({
-                            "name": holiday_name,
-                            "holiday_list_name": holiday_name
-                        })
-                except:
-                    pass
-        
+        rule_data["users"] = [{"user": user.user} for user in (doc.users or [])]
+
+        # Include JSON condition payloads for desk UI
+        rule_data["assignConditionJson"] = json.loads(doc.assign_condition_json or "[]") if getattr(doc, "assign_condition_json", None) else []
+        rule_data["unassignConditionJson"] = json.loads(doc.unassign_condition_json or "[]") if getattr(doc, "unassign_condition_json", None) else []
+
+        # Assignment days simplified to list of day strings
+        rule_data["assignmentDays"] = [row.day for row in (doc.assignment_days or [])]
+
+        # Gather dynamic user assignments (new multi-select + legacy link fallback)
+        dynamic_assignments = []
+        if getattr(doc, "custom_dynamic_user_assignment", None):
+            for row in doc.custom_dynamic_user_assignment:
+                assignment_id = getattr(row, "assignment_id", None)
+                if not assignment_id:
+                    continue
+                dynamic_assignments.append(_get_dynamic_assignment_details(assignment_id))
+        elif getattr(doc, "custom_user_assignment", None):
+            dynamic_assignments.append(_get_dynamic_assignment_details(doc.custom_user_assignment))
+        rule_data["dynamicUserAssignments"] = [entry for entry in dynamic_assignments if entry]
+
+        # Resolve linked holidays
+        holidays = []
+        if getattr(doc, "custom_holiday_lists", None):
+            for row in doc.custom_holiday_lists:
+                holiday_name = getattr(row, "holiday", None)
+                if not holiday_name:
+                    continue
+                holiday = frappe.db.get_value(
+                    "Holidays",
+                    holiday_name,
+                    ["name", "holiday_name", "date", "type", "repeat_next_year"],
+                    as_dict=True,
+                )
+                if holiday:
+                    holidays.append(holiday)
+        rule_data["holidays"] = holidays
+
         return rule_data
     except Exception as e:
         frappe.log_error(f"Error fetching assignment rule details: {str(e)}")
-        frappe.throw(f"Could not fetch assignment rule: {str(e)}")
+        frappe.throw(_("Could not fetch assignment rule: {0}").format(e))
 
 
 @frappe.whitelist()
@@ -86,68 +93,143 @@ def save_assignment_rule(data):
     """Save assignment rule with all custom fields"""
     try:
         if isinstance(data, str):
-            data = json.loads(data)
-        
-        if data.get("name"):
-            # Update existing
-            doc = frappe.get_doc("Assignment Rule", data["name"])
+            data = frappe.parse_json(data)
+
+        data = data or {}
+        name = data.get("name")
+        if name:
+            doc = frappe.get_doc("Assignment Rule", name)
         else:
-            # Create new
             doc = frappe.new_doc("Assignment Rule")
-            doc.document_type = "HD Ticket"
-        
-        # Set basic fields
-        doc.assignment_rule_name = data.get("assignmentRuleName") or data.get("name")
+            doc.document_type = data.get("document_type", "HD Ticket")
+
+        doc.document_type = data.get("document_type", doc.document_type or "HD Ticket")
+        doc.assignment_rule_name = (
+            data.get("assignmentRuleName")
+            or data.get("name")
+            or getattr(doc, "assignment_rule_name", None)
+            or doc.name
+        )
         doc.description = data.get("description", "")
-        doc.disabled = data.get("disabled", 0)
-        doc.priority = data.get("priority", 1)
-        doc.rule = data.get("rule", "Round Robin")
-        
-        # Set conditions
-        if data.get("assignCondition"):
-            doc.condition = data["assignCondition"]
-        if data.get("unassignCondition"):
-            doc.unassign_condition = data["unassignCondition"]
-        
-        # Set users
+        doc.disabled = int(data.get("disabled", 0))
+        doc.priority = int(data.get("priority", doc.priority or 1))
+        doc.rule = data.get("rule", doc.rule or "Round Robin")
+
+        assign_condition_json = data.get("assignConditionJson")
+        if assign_condition_json is not None:
+            doc.assign_condition_json = json.dumps(assign_condition_json)
+        elif data.get("assign_condition_json") is not None:
+            doc.assign_condition_json = data["assign_condition_json"]
+
+        assign_condition = data.get("assignCondition")
+        if assign_condition is not None:
+            doc.assign_condition = assign_condition
+
+        unassign_condition_json = data.get("unassignConditionJson")
+        if unassign_condition_json is not None:
+            doc.unassign_condition_json = json.dumps(unassign_condition_json)
+        elif data.get("unassign_condition_json") is not None:
+            doc.unassign_condition_json = data["unassign_condition_json"]
+
+        unassign_condition = data.get("unassignCondition")
+        if unassign_condition is not None:
+            doc.unassign_condition = unassign_condition
+
+        # Assignment days
+        doc.assignment_days = []
+        for day in data.get("assignmentDays") or []:
+            if day:
+                doc.append("assignment_days", {"day": day})
+
+        # Users
         doc.users = []
+        seen_users = set()
         for user in data.get("users", []):
-            doc.append("users", {"user": user.get("user")})
-        
-        # Set dynamic user assignment
-        if data.get("dynamicUserAssignments"):
-            for assignment in data["dynamicUserAssignments"]:
-                if assignment.get("name"):
-                    doc.custom_user_assignment = assignment["name"]
-                    break
-        
-        # Set holidays as JSON string
-        if data.get("holidays"):
-            holiday_names = [h.get("name") for h in data["holidays"] if h.get("name")]
-            doc.custom_holiday_lists = json.dumps(holiday_names) if holiday_names else None
-        
-        # Set assignment days
-        if data.get("assignmentDays"):
-            days_map = {
-                "Monday": "custom_monday",
-                "Tuesday": "custom_tuesday",
-                "Wednesday": "custom_wednesday",
-                "Thursday": "custom_thursday",
-                "Friday": "custom_friday",
-                "Saturday": "custom_saturday",
-                "Sunday": "custom_sunday"
-            }
-            for day, field in days_map.items():
-                if hasattr(doc, field):
-                    setattr(doc, field, 1 if day in data["assignmentDays"] else 0)
-        
-        doc.save()
+            user_id = user.get("user") or user.get("email")
+            if user_id and user_id not in seen_users:
+                doc.append("users", {"user": user_id})
+                seen_users.add(user_id)
+
+        # Dynamic user assignments (multi-select + legacy link)
+        doc.custom_dynamic_user_assignment = []
+        dynamic_assignment_ids = []
+        for assignment in data.get("dynamicUserAssignments", []):
+            assignment_id = assignment.get("name") or assignment.get("assignment_id")
+            if assignment_id:
+                doc.append("custom_dynamic_user_assignment", {"assignment_id": assignment_id})
+                dynamic_assignment_ids.append(assignment_id)
+
+        # Handle legacy custom_user_assignment field
+        legacy_assignment = data.get("custom_user_assignment")
+        if legacy_assignment:
+            doc.custom_user_assignment = legacy_assignment
+            # If legacy assignment is not already in dynamic_assignment_ids, add its users
+            if legacy_assignment not in dynamic_assignment_ids:
+                for user in get_users_for_assignment(legacy_assignment) or []:
+                    user_id = user.get("email") or user.get("user")
+                    if user_id and user_id not in seen_users:
+                        doc.append("users", {"user": user_id})
+                        seen_users.add(user_id)
+
+        # Add users from all dynamic assignments
+        for assignment_id in dynamic_assignment_ids:
+            for user in get_users_for_assignment(assignment_id) or []:
+                user_id = user.get("email") or user.get("user")
+                if user_id and user_id not in seen_users:
+                    doc.append("users", {"user": user_id})
+                    seen_users.add(user_id)
+
+        # Holiday lists
+        doc.custom_holiday_lists = []
+        for holiday in data.get("holidays", []):
+            holiday_name = holiday.get("name") or holiday.get("holiday")
+            if holiday_name:
+                doc.append("custom_holiday_lists", {"holiday": holiday_name})
+
+        if not name and doc.assignment_rule_name:
+            doc.name = doc.assignment_rule_name
+
+        doc.save(ignore_permissions=True)
+
+        new_name = data.get("assignmentRuleName")
+        if new_name and doc.name != new_name:
+            frappe.rename_doc("Assignment Rule", doc.name, new_name, force=1, ignore_permissions=True)
+            doc = frappe.get_doc("Assignment Rule", new_name)
+
         frappe.db.commit()
-        
-        return {"name": doc.name, "message": "Assignment rule saved successfully"}
+
+        return {"name": doc.name, "message": _("Assignment rule saved successfully")}
     except Exception as e:
         frappe.log_error(f"Error saving assignment rule: {str(e)}")
-        frappe.throw(f"Could not save assignment rule: {str(e)}")
+        frappe.throw(_("Could not save assignment rule: {0}").format(e))
+
+
+def _get_dynamic_assignment_details(assignment_id):
+    if not assignment_id:
+        return None
+
+    try:
+        assignment = frappe.get_doc("Dynamic User Assignment", assignment_id)
+        resolved_users = get_users_for_assignment(assignment.name) or []
+
+        if hasattr(assignment, "assigned_users") and assignment.assigned_users:
+            user_count = len(assignment.assigned_users)
+        elif hasattr(assignment, "users") and assignment.users:
+            user_count = len(assignment.users)
+        else:
+            user_count = len(resolved_users)
+
+        return {
+            "name": assignment.name,
+            "assignment_name": getattr(assignment, "assignment_name", assignment.name),
+            "assignment_code": getattr(assignment, "assignment_code", None),
+            "description": getattr(assignment, "description", None),
+            "default": getattr(assignment, "default", 0),
+            "user_count": user_count,
+            "users": resolved_users,
+        }
+    except Exception:
+        return {"name": assignment_id}
 
 
 @frappe.whitelist()

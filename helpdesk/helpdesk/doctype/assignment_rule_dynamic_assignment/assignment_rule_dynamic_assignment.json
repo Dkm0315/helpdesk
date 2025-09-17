@@ -1,0 +1,42 @@
+{
+ "actions": [],
+ "allow_read": 1,
+ "creation": "2025-09-13 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "assignment_id",
+  "assignment_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "assignment_id",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Dynamic Assignment",
+   "options": "Dynamic User Assignment",
+   "reqd": 1
+  },
+  {
+   "fieldname": "assignment_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Assignment Name",
+   "read_only": 1,
+   "fetch_from": "assignment_id.assignment_name"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Helpdesk",
+ "name": "Assignment Rule Dynamic Assignment",
+ "owner": "Administrator",
+ "permissions": [],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

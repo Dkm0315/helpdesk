@@ -264,6 +264,36 @@ def get_custom_fields():
                 "insert_after": "unassign_condition",
                 "depends_on": "eval: doc.unassign_condition_json",
             },
+            {
+                "fieldname": "custom_dynamic_assignment_section",
+                "fieldtype": "Section Break",
+                "label": "Dynamic Assignments",
+                "description": "Link Dynamic User Assignment rules",
+                "insert_after": "users",
+            },
+            {
+                "fieldname": "custom_dynamic_user_assignment",
+                "fieldtype": "Table MultiSelect",
+                "label": "Dynamic User Assignments",
+                "options": "Assignment Rule Dynamic Assignment",
+                "description": "Select Dynamic User Assignment records to auto-populate assignees",
+                "insert_after": "custom_dynamic_assignment_section",
+            },
+            {
+                "fieldname": "custom_holiday_section",
+                "fieldtype": "Section Break",
+                "label": "Holiday Lists",
+                "description": "Holiday lists considered for this rule",
+                "insert_after": "custom_dynamic_user_assignment",
+            },
+            {
+                "fieldname": "custom_holiday_lists",
+                "fieldtype": "Table MultiSelect",
+                "label": "Holiday Lists",
+                "options": "Assignment Rule Holiday",
+                "description": "Select holidays to exclude when routing tickets",
+                "insert_after": "custom_holiday_section",
+            },
         ],
     }
 

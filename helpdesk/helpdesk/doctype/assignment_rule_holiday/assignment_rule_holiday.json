@@ -1,0 +1,42 @@
+{
+ "actions": [],
+ "allow_read": 1,
+ "creation": "2025-09-13 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "holiday",
+  "holiday_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "holiday",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Holiday",
+   "options": "Holidays",
+   "reqd": 1
+  },
+  {
+   "fieldname": "holiday_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Holiday Name",
+   "read_only": 1,
+   "fetch_from": "holiday.holiday_name"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Helpdesk",
+ "name": "Assignment Rule Holiday",
+ "owner": "Administrator",
+ "permissions": [],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

@@ -7,18 +7,20 @@ def on_assignment_rule_apply(doc, method=None):
     """
     try:
         # Check if the rule has dynamic user assignments
-        if hasattr(doc, 'custom_dynamic_user_assignments') and doc.custom_dynamic_user_assignments:
+        if hasattr(doc, 'custom_dynamic_user_assignment') and doc.custom_dynamic_user_assignment:
             users_to_add = []
             user_emails = set()
-            
+
             # Get users from each Dynamic User Assignment
-            for assignment_ref in doc.custom_dynamic_user_assignments:
-                if assignment_ref.get('assignment_id'):
-                    users = get_users_from_dynamic_assignment(assignment_ref.get('assignment_id'))
+            for assignment_ref in doc.custom_dynamic_user_assignment:
+                assignment_id = getattr(assignment_ref, 'assignment_id', None) or assignment_ref.get('assignment_id')
+                if assignment_id:
+                    users = get_users_from_dynamic_assignment(assignment_id)
                     for user in users:
-                        if user['email'] not in user_emails:
-                            user_emails.add(user['email'])
-                            users_to_add.append(user)
+                        email = user.get('email') or user.get('user')
+                        if email and email not in user_emails:
+                            user_emails.add(email)
+                            users_to_add.append({**user, 'email': email})
             
             # Add users to the assignment rule if not already present
             existing_users = set([u.user for u in (doc.users or [])])
