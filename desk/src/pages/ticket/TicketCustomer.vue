@@ -10,9 +10,20 @@
           :actions="ticket.data._customActions"
         />
         <Button
-          v-if="isRaiser && ticket.data.status !== 'Closed'"
+          v-if="ticket.data.status === 'Replied'"
+          label="Resolve"
+          theme="green"
+          variant="solid"
+          @click="triggerResolve()"
+        >
+          <template #prefix>
+            <Icon icon="lucide:check-circle" />
+          </template>
+        </Button>
+        <Button
+          v-else-if="isRaiser && ticket.data.status !== 'Closed'"
           label="Close"
-          theme="gray"
+          theme="red"
           variant="solid"
           @click="triggerClose()"
         >
@@ -24,7 +35,7 @@
           v-else-if="!isRaiser && ticket.data.status !== 'Closed'"
           label="Request Closure"
           theme="gray"
-          variant="subtle"
+          variant="solid"
           @click="triggerRequestClosure()"
         />
       </template>
@@ -73,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { LayoutHeader } from "@/components";
+import { LayoutHeader, TextEditor } from "@/components";
 import TicketCustomerSidebar from "@/components/ticket/TicketCustomerSidebar.vue";
 import { setupCustomizations } from "@/composables/formCustomisation";
 import { useScreenSize } from "@/composables/screen";
@@ -187,34 +198,151 @@ const isRaiser = computed(() => {
 function triggerClose() {
   $dialog({
     title: "Close Ticket",
-    message: "Provide resolution notes before closing.",
+    message: "Please provide resolution details to close this ticket.",
     actions: [],
     render: ({ close }) => {
       const notes = ref("");
+      const isLoading = ref(false);
+      const error = ref("");
+
       return h("div", { class: "flex flex-col gap-3" }, [
+        error.value && h("div", {
+          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+        }, error.value),
         h(FormControl, {
           type: "textarea",
-          placeholder: "Resolution notes",
+          placeholder: "Describe how this ticket was resolved...",
+          rows: 4,
           modelValue: notes.value,
-          "onUpdate:modelValue": (v: string) => (notes.value = v),
-        }),
-        h(
-          Button,
-          {
-            variant: "solid",
-            label: "Confirm Close",
-            onClick: async () => {
-              await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
-                ticket_id: props.ticketId,
-                resolution_notes: notes.value || "",
-              });
-              toast.success("Ticket closed");
-              ticket.reload();
-              close();
-            },
+          "onUpdate:modelValue": (v: string) => {
+            notes.value = v;
+            error.value = "";
           },
-          {}
-        ),
+        }),
+        h("div", { class: "flex gap-2 justify-end" }, [
+          h(
+            Button,
+            {
+              variant: "subtle",
+              label: "Cancel",
+              onClick: close,
+            },
+            {}
+          ),
+          h(
+            Button,
+            {
+              variant: "solid",
+              theme: "red",
+              label: "Close Ticket",
+              loading: isLoading.value,
+              onClick: async () => {
+                if (!notes.value.trim()) {
+                  error.value = "Resolution details are required";
+                  return;
+                }
+
+                try {
+                  isLoading.value = true;
+                  await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
+                    ticket_id: props.ticketId,
+                    resolution_notes: notes.value,
+                  });
+                  toast.success("Ticket closed successfully");
+                  ticket.reload();
+                  close();
+                } catch (err) {
+                  error.value = err.message || "Failed to close ticket";
+                } finally {
+                  isLoading.value = false;
+                }
+              },
+            },
+            {}
+          ),
+        ]),
+      ]);
+    },
+  });
+}
+
+function triggerResolve() {
+  $dialog({
+    title: "Resolve Ticket",
+    message: "Provide detailed resolution information below.",
+    actions: [],
+    render: ({ close }) => {
+      const resolutionDetails = ref(`Resolution Summary
+
+Issue: Brief description of the problem
+
+Solution:
+- Step 1: What was done
+- Step 2: Additional actions taken
+
+Result: Issue resolved successfully
+
+Notes: Any additional information...`);
+      const isLoading = ref(false);
+      const error = ref("");
+
+      return h("div", { class: "flex flex-col gap-3" }, [
+        error.value && h("div", {
+          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+        }, error.value),
+        h("div", { class: "text-sm text-gray-600 mb-2" }, "Provide detailed resolution information."),
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "Provide detailed resolution information...",
+          rows: 8,
+          modelValue: resolutionDetails.value,
+          "onUpdate:modelValue": (v: string) => {
+            resolutionDetails.value = v;
+            error.value = "";
+          },
+        }),
+        h("div", { class: "flex gap-2 justify-end mt-4" }, [
+          h(
+            Button,
+            {
+              variant: "subtle",
+              label: "Cancel",
+              onClick: close,
+            },
+            {}
+          ),
+          h(
+            Button,
+            {
+              variant: "solid",
+              theme: "green",
+              label: "Resolve Ticket",
+              loading: isLoading.value,
+              onClick: async () => {
+                if (!resolutionDetails.value.trim() || resolutionDetails.value.trim() === "<p></p>") {
+                  error.value = "Resolution details are required";
+                  return;
+                }
+
+                try {
+                  isLoading.value = true;
+                  await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
+                    ticket_id: props.ticketId,
+                    resolution_notes: resolutionDetails.value,
+                  });
+                  toast.success("Ticket resolved successfully");
+                  ticket.reload();
+                  close();
+                } catch (err) {
+                  error.value = err.message || "Failed to resolve ticket";
+                } finally {
+                  isLoading.value = false;
+                }
+              },
+            },
+            {}
+          ),
+        ]),
       ]);
     },
   });
@@ -223,34 +351,69 @@ function triggerClose() {
 function triggerRequestClosure() {
   $dialog({
     title: "Request Closure",
-    message: "Provide resolution notes to request closure.",
+    message: "Request that this ticket be closed by providing resolution details.",
     actions: [],
     render: ({ close }) => {
       const notes = ref("");
+      const isLoading = ref(false);
+      const error = ref("");
+
       return h("div", { class: "flex flex-col gap-3" }, [
+        error.value && h("div", {
+          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+        }, error.value),
         h(FormControl, {
           type: "textarea",
-          placeholder: "Resolution notes",
+          placeholder: "Describe how this ticket was resolved...",
+          rows: 4,
           modelValue: notes.value,
-          "onUpdate:modelValue": (v: string) => (notes.value = v),
-        }),
-        h(
-          Button,
-          {
-            variant: "solid",
-            label: "Send Request",
-            onClick: async () => {
-              await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
-                ticket_id: props.ticketId,
-                resolution_notes: notes.value || "",
-              });
-              toast.success("Closure requested");
-              ticket.reload();
-              close();
-            },
+          "onUpdate:modelValue": (v: string) => {
+            notes.value = v;
+            error.value = "";
           },
-          {}
-        ),
+        }),
+        h("div", { class: "flex gap-2 justify-end" }, [
+          h(
+            Button,
+            {
+              variant: "subtle",
+              label: "Cancel",
+              onClick: close,
+            },
+            {}
+          ),
+          h(
+            Button,
+            {
+              variant: "solid",
+              theme: "gray",
+              label: "Request Closure",
+              loading: isLoading.value,
+              onClick: async () => {
+                if (!notes.value.trim()) {
+                  error.value = "Resolution details are required";
+                  return;
+                }
+
+                try {
+                  isLoading.value = true;
+                  await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+                    ticket_id: props.ticketId,
+                    resolution_notes: notes.value,
+                  });
+                  toast.success("Closure request submitted successfully");
+                  ticket.reload();
+                  close();
+                } catch (err) {
+                  error.value = err.message || "Failed to submit closure request";
+                } finally {
+                  isLoading.value = false;
+                }
+              },
+            },
+            {}
+          ),
+        ]),
       ]);
     },
   });
