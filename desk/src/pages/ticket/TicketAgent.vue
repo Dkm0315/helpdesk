@@ -676,7 +676,38 @@ async function triggerClose() {
 }
 
 
-function triggerRequestClosure() {
+async function triggerRequestClosure() {
+  console.log('[triggerRequestClosure] Called');
+  console.log('[triggerRequestClosure] Resolution details:', ticket.data.resolution_details);
+
+  // Check if resolution already exists
+  const hasResolution = ticket.data.resolution_details &&
+                       ticket.data.resolution_details.trim() &&
+                       ticket.data.resolution_details.trim() !== '<p></p>';
+
+  // If resolution exists, directly request closure without asking for details again
+  if (hasResolution) {
+    console.log('[triggerRequestClosure] Resolution exists, requesting closure directly');
+    try {
+      const response = await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+        ticket_id: props.ticketId,
+        resolution_notes: ticket.data.resolution_details,
+      });
+      console.log('[triggerRequestClosure] Response:', response);
+      console.log('[triggerRequestClosure] Email sent:', response?.email_sent);
+      console.log('[triggerRequestClosure] Notification created:', response?.notification_created);
+
+      toast.success(response?.message || "Closure request submitted successfully");
+      ticket.reload();
+    } catch (err) {
+      console.error('[triggerRequestClosure] Error:', err);
+      toast.error(err.message || "Failed to submit closure request");
+    }
+    return;
+  }
+
+  // No resolution exists, show modal to collect details
+  console.log('[triggerRequestClosure] No resolution, showing modal');
   $dialog({
     title: "Request Closure",
     message: "Request that this ticket be closed by providing resolution details.",

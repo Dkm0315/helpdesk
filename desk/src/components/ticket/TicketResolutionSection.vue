@@ -7,16 +7,18 @@
       </p>
     </div>
 
-    <div v-if="ticket.status === 'Resolved'" class="flex-1 p-6">
+    <div v-if="ticket.status === 'Resolved' || ticket.status === 'Closed'" class="flex-1 p-6">
       <div class="bg-green-50 border border-green-200 rounded-lg p-4">
         <div class="flex items-start">
           <TicketIcon class="h-5 w-5 text-green-600 mt-0.5 mr-3" />
           <div class="flex-1">
-            <h4 class="text-sm font-medium text-green-800">Ticket Resolved</h4>
+            <h4 class="text-sm font-medium text-green-800">
+              {{ ticket.status === 'Closed' ? 'Ticket Closed' : 'Ticket Resolved' }}
+            </h4>
             <div class="mt-2 text-sm text-green-700" v-html="ticket.resolution_details || 'No resolution details provided.'">
             </div>
             <div class="mt-3 text-xs text-green-600">
-              Resolved on {{ formatDate(ticket.resolution_date) }}
+              {{ ticket.status === 'Closed' ? 'Closed' : 'Resolved' }} on {{ formatDate(ticket.resolution_date || ticket.modified) }}
             </div>
           </div>
         </div>
