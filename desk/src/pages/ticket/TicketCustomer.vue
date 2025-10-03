@@ -21,7 +21,7 @@
           </template>
         </Button>
         <Button
-          v-else-if="isRaiser && ticket.data.status !== 'Closed'"
+          v-else-if="canCloseTicket && ticket.data.status !== 'Closed'"
           label="Close"
           theme="red"
           variant="solid"
@@ -32,7 +32,7 @@
           </template>
         </Button>
         <Button
-          v-else-if="!isRaiser && ticket.data.status !== 'Closed'"
+          v-else-if="canRequestClosure && ticket.data.status !== 'Closed'"
           label="Request Closure"
           theme="gray"
           variant="solid"
@@ -46,14 +46,32 @@
         <!-- show for only mobile -->
         <TicketCustomerTemplateFields v-if="isMobileView" />
 
-        <TicketConversation class="grow" />
+        <div class="flex-1 overflow-hidden flex flex-col">
+          <Tabs v-model="tabIndex" :tabs="tabs">
+            <TabList />
+            <TabPanel v-slot="{ tab }" class="h-full">
+              <TicketResolutionSection
+                v-if="tab.name === 'resolution'"
+                :ticket="ticket.data"
+                :ticket-id="ticketId"
+                @update="
+                  () => {
+                    ticket.reload();
+                  }
+                "
+              />
+              <TicketConversation v-else class="grow" />
+            </TabPanel>
+          </Tabs>
+        </div>
+
         <div
+          v-if="showEditor"
           class="w-full p-5"
           @keydown.ctrl.enter.capture.stop="sendEmail"
           @keydown.meta.enter.capture.stop="sendEmail"
         >
           <TicketTextEditor
-            v-if="showEditor"
             ref="editor"
             v-model:attachments="attachments"
             v-model:content="editorContent"
@@ -94,8 +112,9 @@ import { globalStore } from "@/stores/globalStore";
 import { isContentEmpty, uploadFunction } from "@/utils";
 import { Icon } from "@iconify/vue";
 import { Breadcrumbs, Button, FormControl, call, createResource, toast } from "frappe-ui";
-import { computed, onMounted, onUnmounted, provide, ref } from "vue";
+import { computed, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
 import { useTicket } from "./data";
 import { useAuthStore } from "@/stores/auth";
 import { ITicket } from "./symbols";
@@ -103,6 +122,10 @@ import TicketCustomerTemplateFields from "./TicketCustomerTemplateFields.vue";
 import TicketConversation from "./TicketConversation.vue";
 import TicketFeedback from "./TicketFeedback.vue";
 import TicketTextEditor from "./TicketTextEditor.vue";
+import TicketResolutionSection from "@/components/ticket/TicketResolutionSection.vue";
+import { Tabs, TabList, TabPanel } from "frappe-ui";
+import { ActivityIcon, CommentIcon, EmailIcon, TicketIcon } from "@/components/icons";
+import { ref as vueRef } from "vue";
 
 interface P {
   ticketId: string;
@@ -136,10 +159,24 @@ const editorContent = ref("");
 const attachments = ref([]);
 const showFeedbackDialog = ref(false);
 const isExpanded = ref(false);
+const tabIndex = vueRef(0);
 
 const { isMobileView } = useScreenSize();
 const { $dialog } = globalStore();
-const { userId } = useAuthStore();
+const authStore = useAuthStore();
+const { userId } = storeToRefs(authStore);
+
+// Fallback to session user from cookie if auth store not loaded yet
+const sessionUser = computed(() => {
+  const cookies = new URLSearchParams(document.cookie.split("; ").join("&"));
+  let _sessionUser = cookies.get("user_id");
+  if (_sessionUser === "Guest") {
+    _sessionUser = null;
+  }
+  return _sessionUser;
+});
+
+const currentUserId = computed(() => userId.value || sessionUser.value);
 
 const send = createResource({
   url: "run_doc_method",
@@ -191,11 +228,68 @@ function updateTicket(fieldname: string, value: string) {
 }
 
 const isRaiser = computed(() => {
-  if (!ticket.data) return false;
-  return (userId as any).value === ticket.data.raised_by;
+  if (!ticket.data || !currentUserId.value) return false;
+  return currentUserId.value === ticket.data.raised_by;
 });
 
-function triggerClose() {
+const canCloseTicket = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // In customer portal, user can close if they are the raised_by user
+  // The backend sets raised_by to the correct user (either the person who created it,
+  // or the employee for whom it was raised)
+  if (ticket.data.raised_by === currentUserId.value) {
+    return true;
+  }
+
+  return false;
+});
+
+const canRequestClosure = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // Ticket already closed - no action needed
+  if (ticket.data.status === 'Closed') {
+    return false;
+  }
+
+  // In customer portal, users don't request closure
+  // They either can close or they can't do anything
+  return false;
+});
+
+async function triggerClose() {
+  console.log('[triggerClose] Called. Current status:', ticket.data.status);
+  console.log('[triggerClose] Resolution details:', ticket.data.resolution_details);
+
+  // Validate that resolution exists before allowing close
+  const hasResolution = ticket.data.resolution_details &&
+                       ticket.data.resolution_details.trim() &&
+                       ticket.data.resolution_details.trim() !== '<p></p>';
+
+  console.log('[triggerClose] hasResolution:', hasResolution);
+
+  // Check if resolution details are already filled
+  if (hasResolution) {
+    // Resolution details exist, directly close the ticket
+    console.log('[triggerClose] Has resolution, closing directly');
+    try {
+      await call("frappe.client.set_value", {
+        doctype: "HD Ticket",
+        name: props.ticketId,
+        fieldname: "status",
+        value: "Closed",
+      });
+      console.log('[triggerClose] Ticket closed successfully');
+      toast.success("Ticket closed successfully");
+      ticket.reload();
+    } catch (err) {
+      console.error('[triggerClose] Error closing ticket:', err);
+      toast.error(err.message || "Failed to close ticket");
+    }
+    return;
+  }
+
   $dialog({
     title: "Close Ticket",
     message: "Please provide resolution details to close this ticket.",
@@ -445,6 +539,19 @@ const breadcrumbs = computed(() => {
   return items;
 });
 
+const tabs = [
+  {
+    name: "conversation",
+    label: "Conversation",
+    icon: ActivityIcon,
+  },
+  {
+    name: "resolution",
+    label: "Resolution",
+    icon: TicketIcon,
+  },
+];
+
 const showEditor = computed(() => ticket.data.status !== "Closed");
 
 // this handles whether the ticket was raised and then was closed without any reply from the agent.
@@ -464,6 +571,27 @@ onMounted(() => {
     }
   });
 });
+
+// Debug button visibility
+watch(
+  () => ticket.data,
+  (val) => {
+    if (val) {
+      console.log('=== TICKET CUSTOMER DEBUG ===');
+      console.log('userId (from store):', userId.value);
+      console.log('sessionUser (from cookie):', sessionUser.value);
+      console.log('currentUserId (computed):', currentUserId.value);
+      console.log('Ticket raised_by:', val.raised_by);
+      console.log('Ticket custom_raise_for_employee:', val.custom_raise_for_employee);
+      console.log('Ticket status:', val.status);
+      console.log('isRaiser:', isRaiser.value);
+      console.log('canCloseTicket:', canCloseTicket.value);
+      console.log('canRequestClosure:', canRequestClosure.value);
+      console.log('=============================');
+    }
+  },
+  { deep: true, immediate: true }
+);
 
 onUnmounted(() => {
   document.title = "Helpdesk";

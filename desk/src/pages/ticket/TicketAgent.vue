@@ -50,14 +50,7 @@
           </template>
         </Dropdown>
         <Button
-          v-if="ticket.data.status === 'Resolved'"
-          label="Close"
-          variant="solid"
-          theme="red"
-          @click="triggerClose()"
-        />
-        <Button
-          v-else-if="canCloseTicket && ticket.data.status !== 'Closed'"
+          v-if="canCloseTicket && ticket.data.status !== 'Closed'"
           label="Close"
           variant="solid"
           theme="red"
@@ -183,6 +176,7 @@ import {
 } from "frappe-ui";
 import { computed, h, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
 
 import {
   AssignmentModal,
@@ -217,8 +211,21 @@ const router = useRouter();
 
 const ticketStatusStore = useTicketStatusStore();
 const { getUser } = useUserStore();
-const { userId } = useAuthStore();
+const authStore = useAuthStore();
+const { userId, isAdmin, isAgent } = storeToRefs(authStore);
 const { $dialog } = globalStore();
+
+// Fallback to session user from cookie if auth store not loaded yet
+const sessionUser = computed(() => {
+  const cookies = new URLSearchParams(document.cookie.split("; ").join("&"));
+  let _sessionUser = cookies.get("user_id");
+  if (_sessionUser === "Guest") {
+    _sessionUser = null;
+  }
+  return _sessionUser;
+});
+
+const currentUserId = computed(() => userId.value || sessionUser.value);
 const ticketAgentActivitiesRef = ref(null);
 const communicationAreaRef = ref(null);
 const renameSubject = ref("");
@@ -301,46 +308,85 @@ const breadcrumbs = computed(() => {
 });
 
 const isRaiser = computed(() => {
-  if (!ticket.data) return false;
-  return (userId as any).value === ticket.data.raised_by;
+  if (!ticket.data || !currentUserId.value) return false;
+  return currentUserId.value === ticket.data.raised_by;
 });
 
+const isRaisedForCurrentUser = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+  // Check if ticket was raised for another employee and current user is that employee
+  // Since custom_raise_for_employee stores Employee ID, we need to check if raised_by matches current user
+  // The backend should have already set raised_by to the employee's user_id
+  if (ticket.data.custom_raise_for_employee) {
+    return ticket.data.raised_by === currentUserId.value;
+  }
+  return false;
+});
+
+const isAssignedAgent = () => {
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // Check if user is directly assigned
+  if (ticket.data.assignees && Array.isArray(ticket.data.assignees)) {
+    const assignedUsers = ticket.data.assignees.map(a => a.name);
+    if (assignedUsers.includes(currentUserId.value)) return true;
+  }
+
+  return false;
+};
+
 const canCloseTicket = computed(() => {
-  if (!ticket.data) return false;
-  // System manager/admin can always close
-  if (isAdmin()) return true;
-  // User who raised the ticket can close
-  if ((userId as any).value === ticket.data.raised_by) return true;
-  // User for whom the ticket is raised (contact) can close
-  if (ticket.data.contact === (userId as any).value) return true;
-  // Assigned agents or team members can close
-  return isAssignedToTicket();
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // Admin can always close any ticket
+  if (isAdmin.value) {
+    return true;
+  }
+
+  // User who raised the ticket can close if:
+  // 1. They raised it for themselves (no custom_raise_for_employee)
+  // 2. OR ticket is raised_by current user
+  if (isRaiser.value) {
+    // If there's no custom_raise_for_employee, or it's empty, raiser can close
+    if (!ticket.data.custom_raise_for_employee) {
+      return true;
+    }
+  }
+
+  // If ticket was raised for someone else, check if current user is that person
+  // The raised_by field should be set to the employee's user_id
+  if (ticket.data.custom_raise_for_employee && ticket.data.raised_by === currentUserId.value) {
+    return true;
+  }
+
+  return false;
 });
 
 const canRequestClosure = computed(() => {
-  if (!ticket.data) return false;
-  // Same logic as canCloseTicket for now - both actions are available to authorized users
-  return canCloseTicket.value;
-});
+  if (!ticket.data || !currentUserId.value) return false;
 
-const isAssignedToTicket = () => {
-  if (!ticket.data) return false;
-  const currentUserId = (userId as any).value;
-
-  // Check if user is directly assigned
-  if (ticket.data.assignees) {
-    const assignedUsers = ticket.data.assignees.map(a => a.name);
-    if (assignedUsers.includes(currentUserId)) return true;
+  // Ticket already closed - no action needed
+  if (ticket.data.status === 'Closed') {
+    return false;
   }
 
-  // For now, return true if user has write permission (agent/employee)
-  return true; // This will be refined based on actual team membership
-};
+  // If user can close, they don't need to request
+  if (canCloseTicket.value) {
+    return false;
+  }
 
-const isAdmin = () => {
-  // Check if user has system manager permissions
-  return (userId as any).value === 'Administrator' || false; // Simplified check
-};
+  // Assigned agent can request closure
+  if (isAssignedAgent()) {
+    return true;
+  }
+
+  // Any agent can request closure (fallback for agents working on tickets)
+  if (isAgent.value) {
+    return true;
+  }
+
+  return false;
+});
 
 const handleRename = () => {
   if (renameSubject.value === ticket.data?.subject) return;
@@ -514,9 +560,20 @@ function updateOptimistic(fieldname: string, value: string) {
 }
 
 async function triggerClose() {
+  console.log('[triggerClose] Called. Current status:', ticket.data.status);
+  console.log('[triggerClose] Resolution details:', ticket.data.resolution_details);
+
+  // Validate that resolution exists before allowing close
+  const hasResolution = ticket.data.resolution_details &&
+                       ticket.data.resolution_details.trim() &&
+                       ticket.data.resolution_details.trim() !== '<p></p>';
+
+  console.log('[triggerClose] hasResolution:', hasResolution);
+
   // Check if resolution details are already filled
-  if (ticket.data.resolution_details && ticket.data.resolution_details.trim() && ticket.data.resolution_details.trim() !== '<p></p>') {
+  if (hasResolution) {
     // Resolution details exist, directly close the ticket
+    console.log('[triggerClose] Has resolution, closing directly');
     try {
       await call("frappe.client.set_value", {
         doctype: "HD Ticket",
@@ -524,9 +581,11 @@ async function triggerClose() {
         fieldname: "status",
         value: "Closed",
       });
+      console.log('[triggerClose] Ticket closed successfully');
       toast.success("Ticket closed successfully");
       ticket.reload();
     } catch (err) {
+      console.error('[triggerClose] Error closing ticket:', err);
       toast.error(err.message || "Failed to close ticket");
     }
     return;
@@ -666,14 +725,20 @@ function triggerRequestClosure() {
 
                 try {
                   isLoading.value = true;
-                  await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+                  console.log('[triggerRequestClosure] Calling request_closure API');
+                  const response = await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
                     ticket_id: props.ticketId,
                     resolution_notes: notes.value,
                   });
-                  toast.success("Closure request submitted successfully");
+                  console.log('[triggerRequestClosure] Response:', response);
+                  console.log('[triggerRequestClosure] Email sent:', response?.email_sent);
+                  console.log('[triggerRequestClosure] Notification created:', response?.notification_created);
+
+                  toast.success(response?.message || "Closure request submitted successfully");
                   ticket.reload();
                   close();
                 } catch (err) {
+                  console.error('[triggerRequestClosure] Error:', err);
                   error.value = err.message || "Failed to submit closure request";
                 } finally {
                   isLoading.value = false;
@@ -695,6 +760,31 @@ onMounted(() => {
     }
   });
 });
+
+// Debug button visibility
+watch(
+  () => ticket.data,
+  (val) => {
+    if (val) {
+      console.log('=== TICKET AGENT DEBUG ===');
+      console.log('userId (from store):', userId.value);
+      console.log('sessionUser (from cookie):', sessionUser.value);
+      console.log('currentUserId (computed):', currentUserId.value);
+      console.log('Ticket raised_by:', val.raised_by);
+      console.log('Ticket custom_raise_for_employee:', val.custom_raise_for_employee);
+      console.log('Ticket status:', val.status);
+      console.log('isRaiser:', isRaiser.value);
+      console.log('isAdmin (from store):', isAdmin.value);
+      console.log('isAgent (from store):', isAgent.value);
+      console.log('isAssignedAgent:', isAssignedAgent());
+      console.log('Assignees:', val.assignees);
+      console.log('canCloseTicket:', canCloseTicket.value);
+      console.log('canRequestClosure:', canRequestClosure.value);
+      console.log('=========================');
+    }
+  },
+  { deep: true, immediate: true }
+);
 
 onUnmounted(() => {
   document.title = "Helpdesk";

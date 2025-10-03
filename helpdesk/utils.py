@@ -35,7 +35,10 @@ def is_admin(user: str = None) -> bool:
     :return: Whether `user` is an admin
     """
     user = user or frappe.session.user
-    return user == "Administrator"
+    if user == "Administrator":
+        return True
+    user_roles = frappe.get_roles(user)
+    return "System Manager" in user_roles
 
 
 def is_agent(user: str = None) -> bool:
