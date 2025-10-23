@@ -7,7 +7,7 @@
       </p>
     </div>
 
-    <div v-if="ticket.status === 'Resolved' || ticket.status === 'Closed'" class="flex-1 p-6">
+    <div v-if="(ticket.status === 'Resolved' || ticket.status === 'Closed') && ticket.resolution_ever_submitted" class="flex-1 p-6">
       <div class="bg-green-50 border border-green-200 rounded-lg p-4">
         <div class="flex items-start">
           <TicketIcon class="h-5 w-5 text-green-600 mt-0.5 mr-3" />
@@ -17,8 +17,21 @@
             </h4>
             <div class="mt-2 text-sm text-green-700" v-html="ticket.resolution_details || 'No resolution details provided.'">
             </div>
-            <div class="mt-3 text-xs text-green-600">
-              {{ ticket.status === 'Closed' ? 'Closed' : 'Resolved' }} on {{ formatDate(ticket.resolution_date || ticket.modified) }}
+            <div class="mt-3 space-y-1">
+              <div class="text-xs text-green-600">
+                {{ ticket.status === 'Closed' ? 'Closed' : 'Resolved' }} on {{ formatDate(ticket.resolution_date || ticket.modified) }}
+              </div>
+              <div v-if="ticket.resolution_submitted && ticket.resolution_submitted_on" class="text-xs text-green-600">
+                Resolution submitted on {{ formatDate(ticket.resolution_submitted_on) }}
+              </div>
+            </div>
+            <div v-if="canRejectResolution" class="mt-4 pt-3 border-t border-green-200">
+              <Button
+                label="Reject Resolution"
+                variant="outline"
+                theme="red"
+                @click="showRejectDialog = true"
+              />
             </div>
           </div>
         </div>
@@ -50,14 +63,52 @@
         </div>
       </div>
     </div>
+    
+    <!-- Reject Resolution Dialog -->
+    <Dialog v-model="showRejectDialog" :options="{ title: 'Reject Resolution' }">
+      <template #body-content>
+        <div class="flex flex-col gap-3">
+          <p class="text-sm text-gray-600">
+            Please explain why this resolution doesn't solve your issue:
+          </p>
+          <FormControl
+            v-model="rejectionReason"
+            type="textarea"
+            size="md"
+            variant="subtle"
+            placeholder="The resolution provided doesn't solve my issue because..."
+            rows="4"
+          />
+          <div v-if="rejectionError" class="text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded">
+            {{ rejectionError }}
+          </div>
+          <div class="flex gap-2 justify-end">
+            <Button
+              variant="subtle"
+              label="Cancel"
+              @click="showRejectDialog = false"
+            />
+            <Button
+              variant="solid"
+              theme="red"
+              label="Reject Resolution"
+              :loading="isRejecting"
+              @click="rejectResolution"
+            />
+          </div>
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { Button, call, toast } from "frappe-ui";
+import { ref, computed } from "vue";
+import { Button, Dialog, FormControl, call, toast } from "frappe-ui";
 import { TextEditor } from "@/components";
 import { TicketIcon } from "@/components/icons";
+import { useAuthStore } from "@/stores/auth";
+import { storeToRefs } from "pinia";
 
 interface Props {
   ticket: any;
@@ -70,6 +121,46 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+const authStore = useAuthStore();
+const { userId } = storeToRefs(authStore);
+
+// Fallback to session user from cookie if auth store not loaded yet
+const sessionUser = computed(() => {
+  const cookies = new URLSearchParams(document.cookie.split("; ").join("&"));
+  let _sessionUser = cookies.get("user_id");
+  if (_sessionUser === "Guest") {
+    _sessionUser = null;
+  }
+  return _sessionUser;
+});
+
+const currentUserId = computed(() => userId.value || sessionUser.value);
+
+// Check if current user can reject resolution
+const canRejectResolution = computed(() => {
+  if (!props.ticket || !currentUserId.value) return false;
+  
+  // Only allow rejection if ticket has resolution
+  if (!props.ticket.resolution_details || !props.ticket.resolution_details.trim()) {
+    return false;
+  }
+  
+  // User who raised the ticket can reject
+  if (currentUserId.value === props.ticket.raised_by) {
+    return true;
+  }
+  
+  // Employee for whom ticket was raised can reject
+  if (props.ticket.custom_raise_for_employee) {
+    // The raised_by field should already be set to employee's user_id
+    if (currentUserId.value === props.ticket.raised_by) {
+      return true;
+    }
+  }
+  
+  return false;
+});
 
 const resolutionDetails = ref(`<h3>Resolution Summary</h3>
 
@@ -86,6 +177,10 @@ const resolutionDetails = ref(`<h3>Resolution Summary</h3>
 <p><strong>Notes:</strong> Any additional information...</p>`);
 
 const isSubmitting = ref(false);
+const showRejectDialog = ref(false);
+const rejectionReason = ref("");
+const isRejecting = ref(false);
+const rejectionError = ref("");
 
 async function submitResolution() {
   if (!resolutionDetails.value.trim() || resolutionDetails.value.trim() === '<p></p>') {
@@ -96,28 +191,50 @@ async function submitResolution() {
   try {
     isSubmitting.value = true;
 
-    // First update the resolution_details field
+    // Update resolution fields - backend will auto-set resolution_submitted_on
     await call("frappe.client.set_value", {
       doctype: "HD Ticket",
       name: props.ticketId,
-      fieldname: "resolution_details",
-      value: resolutionDetails.value,
+      fieldname: {
+        "resolution_details": resolutionDetails.value,
+        "resolution_submitted": 1,
+        "resolution_ever_submitted": 1,
+        "status": "Resolved"
+      }
     });
 
-    // Then update the status to Resolved
-    await call("frappe.client.set_value", {
-      doctype: "HD Ticket",
-      name: props.ticketId,
-      fieldname: "status",
-      value: "Resolved",
-    });
-
-    toast.success("Ticket marked as resolved");
+    toast.success("Resolution submitted successfully");
     emit("update");
   } catch (err) {
-    toast.error(err.message || "Failed to resolve ticket");
+    toast.error(err.message || "Failed to submit resolution");
   } finally {
     isSubmitting.value = false;
+  }
+}
+
+async function rejectResolution() {
+  if (!rejectionReason.value.trim()) {
+    rejectionError.value = "Please provide a reason for rejection";
+    return;
+  }
+
+  try {
+    isRejecting.value = true;
+    rejectionError.value = "";
+
+    await call("pw_helpdesk.customizations.ticket_closure_workflow.reject_resolution", {
+      ticket_id: props.ticketId,
+      rejection_reason: rejectionReason.value,
+    });
+
+    toast.success("Resolution rejected and ticket reopened");
+    showRejectDialog.value = false;
+    rejectionReason.value = "";
+    emit("update");
+  } catch (err) {
+    rejectionError.value = err.message || "Failed to reject resolution";
+  } finally {
+    isRejecting.value = false;
   }
 }
 

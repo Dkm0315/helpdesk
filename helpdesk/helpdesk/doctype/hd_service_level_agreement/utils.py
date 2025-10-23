@@ -57,3 +57,15 @@ def get_default() -> Document:
             "default_sla": True,
         },
     )
+
+
+def apply(ticket: Document):
+    """
+    Apply SLA to a ticket
+
+    :param ticket: Ticket document to apply SLA to
+    """
+    sla = get_sla(ticket)
+    if sla:
+        sla_doc = frappe.get_doc(DOCTYPE, sla.name)
+        sla_doc.apply(ticket)

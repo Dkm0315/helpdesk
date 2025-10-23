@@ -50,19 +50,42 @@
           </template>
         </Dropdown>
         <Button
-          v-if="canCloseTicket && ticket.data.status !== 'Closed'"
-          label="Close"
-          variant="solid"
+          v-if="canRejectResolution"
+          label="Reject Resolution"
           theme="red"
-          @click="triggerClose()"
-        />
-        <Button
-          v-else-if="canRequestClosure && ticket.data.status !== 'Closed'"
-          label="Request Closure"
-          variant="solid"
-          theme="gray"
-          @click="triggerRequestClosure()"
-        />
+          variant="outline"
+          @click="triggerRejectResolution()"
+        >
+          <template #prefix>
+            <Icon icon="lucide:x-circle" />
+          </template>
+        </Button>
+        <div class="relative">
+          <Button
+            v-if="canCloseTicket && ticket.data.status !== 'Closed'"
+            :label="hasValidResolution ? 'Close' : 'Close (Resolution Required)'"
+            :variant="hasValidResolution ? 'solid' : 'outline'"
+            :theme="hasValidResolution ? 'red' : 'gray'"
+            :disabled="!hasValidResolution"
+            :class="{ 'opacity-60': !hasValidResolution }"
+            @click="triggerClose()"
+          />
+          <Button
+            v-else-if="canRequestClosure && ticket.data.status !== 'Closed'"
+            :label="hasValidResolution ? 'Request Closure' : 'Request Closure (Resolution Required)'"
+            :variant="hasValidResolution ? 'solid' : 'outline'"
+            :theme="hasValidResolution ? 'gray' : 'gray'"
+            :disabled="!hasValidResolution"
+            :class="{ 'opacity-60': !hasValidResolution }"
+            @click="triggerRequestClosure()"
+          />
+          <div
+            v-if="(canCloseTicket || canRequestClosure) && ticket.data.status !== 'Closed' && !hasValidResolution"
+            class="absolute -bottom-8 left-0 text-xs text-gray-500 whitespace-nowrap"
+          >
+            Submit resolution first
+          </div>
+        </div>
       </template>
     </LayoutHeader>
     <div v-if="ticket.data" class="flex h-full overflow-hidden">
@@ -335,6 +358,22 @@ const isAssignedAgent = () => {
   return false;
 };
 
+const hasValidResolution = computed(() => {
+  if (!ticket.data) return false;
+
+  // Check if resolution was submitted
+  if (ticket.data.resolution_submitted) {
+    return true;
+  }
+
+  // Check if resolution details exist and are not empty/default
+  const resolution = ticket.data.resolution_details;
+  return resolution &&
+         resolution.trim() &&
+         resolution.trim() !== '<p></p>' &&
+         resolution.trim() !== '';
+});
+
 const canCloseTicket = computed(() => {
   if (!ticket.data || !currentUserId.value) return false;
 
@@ -388,6 +427,31 @@ const canRequestClosure = computed(() => {
   return false;
 });
 
+const canRejectResolution = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // Only allow rejection if ticket is Resolved or Closed with resolution
+  if (ticket.data.status !== 'Resolved' && ticket.data.status !== 'Closed') {
+    return false;
+  }
+
+  // Must have resolution to reject and it must have been submitted at least once
+  if (!ticket.data.resolution_details || !ticket.data.resolution_details.trim()) {
+    return false;
+  }
+  
+  if (!ticket.data.resolution_ever_submitted) {
+    return false;
+  }
+
+  // User can reject if they are the raised_by user
+  if (ticket.data.raised_by === currentUserId.value) {
+    return true;
+  }
+
+  return false;
+});
+
 const handleRename = () => {
   if (renameSubject.value === ticket.data?.subject) return;
   updateTicket("subject", renameSubject.value);
@@ -416,28 +480,37 @@ const dropdownOptions = computed(() =>
 // );
 
 const tabIndex = ref(0);
-const tabs: TabObject[] = [
-  {
-    name: "activity",
-    label: "Activity",
-    icon: ActivityIcon,
-  },
-  {
-    name: "email",
-    label: "Emails",
-    icon: EmailIcon,
-  },
-  {
-    name: "comment",
-    label: "Comments",
-    icon: CommentIcon,
-  },
-  {
-    name: "resolution",
-    label: "Resolution",
-    icon: TicketIcon,
-  },
-];
+const tabs = computed(() => {
+  const baseTabs: TabObject[] = [
+    {
+      name: "activity",
+      label: "Activity",
+      icon: ActivityIcon,
+    },
+    {
+      name: "email",
+      label: "Emails",
+      icon: EmailIcon,
+    },
+    {
+      name: "comment",
+      label: "Comments",
+      icon: CommentIcon,
+    },
+  ];
+  
+  // Only show Resolution tab if ticket has been replied to or is in later stages
+  const allowedStatuses = ["Replied", "Resolved", "Closed", "Reopened"];
+  if (ticket.data && allowedStatuses.includes(ticket.data.status)) {
+    baseTabs.push({
+      name: "resolution",
+      label: "Resolution",
+      icon: TicketIcon,
+    });
+  }
+  
+  return baseTabs;
+});
 
 const activities = computed(() => {
   const emailProps = ticket.data.communications.map((email, idx: number) => {
@@ -675,6 +748,78 @@ async function triggerClose() {
   });
 }
 
+
+function triggerRejectResolution() {
+  $dialog({
+    title: "Reject Resolution",
+    message: "Please explain why this resolution doesn't solve your issue.",
+    actions: [],
+    render: ({ close }) => {
+      const reason = ref("");
+      const isLoading = ref(false);
+      const error = ref("");
+
+      return h("div", { class: "flex flex-col gap-3" }, [
+        error.value && h("div", {
+          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+        }, error.value),
+        h("div", { class: "text-sm text-gray-600 mb-2" }, "Explain why the provided resolution doesn't solve your issue."),
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "The resolution provided doesn't solve my issue because...",
+          rows: 4,
+          modelValue: reason.value,
+          "onUpdate:modelValue": (v: string) => {
+            reason.value = v;
+            error.value = "";
+          },
+        }),
+        h("div", { class: "flex gap-2 justify-end" }, [
+          h(
+            Button,
+            {
+              variant: "subtle",
+              label: "Cancel",
+              onClick: close,
+            },
+            {}
+          ),
+          h(
+            Button,
+            {
+              variant: "solid",
+              theme: "red",
+              label: "Reject Resolution",
+              loading: isLoading.value,
+              onClick: async () => {
+                if (!reason.value.trim()) {
+                  error.value = "Please provide a reason for rejection";
+                  return;
+                }
+
+                try {
+                  isLoading.value = true;
+                  await call("pw_helpdesk.customizations.ticket_closure_workflow.reject_resolution", {
+                    ticket_id: props.ticketId,
+                    rejection_reason: reason.value,
+                  });
+                  toast.success("Resolution rejected and ticket reopened");
+                  ticket.reload();
+                  close();
+                } catch (err) {
+                  error.value = err.message || "Failed to reject resolution";
+                } finally {
+                  isLoading.value = false;
+                }
+              },
+            },
+            {}
+          ),
+        ]),
+      ]);
+    },
+  });
+}
 
 async function triggerRequestClosure() {
   console.log('[triggerRequestClosure] Called');

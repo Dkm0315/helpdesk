@@ -40,6 +40,9 @@
   "resolution_tab",
   "section_break_19",
   "resolution_details",
+  "resolution_submitted",
+  "resolution_submitted_on",
+  "resolution_ever_submitted",
   "column_break1",
   "opening_date",
   "opening_time",
@@ -102,7 +105,7 @@
    "no_copy": 1,
    "oldfieldname": "status",
    "oldfieldtype": "Select",
-   "options": "Open\nReplied\nResolved\nClosed",
+   "options": "Open\nReplied\nResolved\nClosed\nReopened",
    "search_index": 1
   },
   {
@@ -257,6 +260,33 @@
    "no_copy": 1,
    "oldfieldname": "resolution_details",
    "oldfieldtype": "Text"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "resolution_submitted",
+   "fieldtype": "Check",
+   "label": "Resolution Submitted",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:!doc.__islocal && doc.resolution_submitted",
+   "fieldname": "resolution_submitted_on",
+   "fieldtype": "Datetime",
+   "label": "Resolution Submitted On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:!doc.__islocal",
+   "description": "Tracks if resolution was submitted at least once",
+   "fieldname": "resolution_ever_submitted",
+   "fieldtype": "Check",
+   "label": "Resolution Ever Submitted",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "depends_on": "eval:!doc.__islocal",

@@ -22,9 +22,11 @@
         </Button>
         <Button
           v-else-if="canCloseTicket && ticket.data.status !== 'Closed'"
-          label="Close"
-          theme="red"
-          variant="solid"
+          :label="hasValidResolution ? 'Close' : 'Close (Resolution Required)'"
+          :variant="hasValidResolution ? 'solid' : 'outline'"
+          :theme="hasValidResolution ? 'red' : 'gray'"
+          :disabled="!hasValidResolution"
+          :class="{ 'opacity-60': !hasValidResolution }"
           @click="triggerClose()"
         >
           <template #prefix>
@@ -38,6 +40,28 @@
           variant="solid"
           @click="triggerRequestClosure()"
         />
+        <Button
+          v-else-if="canRejectResolution"
+          label="Reject Resolution"
+          theme="red"
+          variant="outline"
+          @click="triggerRejectResolution()"
+        >
+          <template #prefix>
+            <Icon icon="lucide:x-circle" />
+          </template>
+        </Button>
+        <Button
+          v-else-if="canReopenTicket"
+          label="Reopen Ticket"
+          theme="blue"
+          variant="solid"
+          @click="triggerReopen()"
+        >
+          <template #prefix>
+            <Icon icon="lucide:refresh-cw" />
+          </template>
+        </Button>
       </template>
     </LayoutHeader>
     <div class="flex overflow-hidden h-full w-full">
@@ -112,7 +136,7 @@ import { globalStore } from "@/stores/globalStore";
 import { isContentEmpty, uploadFunction } from "@/utils";
 import { Icon } from "@iconify/vue";
 import { Breadcrumbs, Button, FormControl, call, createResource, toast } from "frappe-ui";
-import { computed, onMounted, onUnmounted, provide, ref, watch } from "vue";
+import { computed, h, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useTicket } from "./data";
@@ -255,6 +279,68 @@ const canRequestClosure = computed(() => {
 
   // In customer portal, users don't request closure
   // They either can close or they can't do anything
+  return false;
+});
+
+const hasValidResolution = computed(() => {
+  if (!ticket.data) return false;
+
+  // Check if resolution was submitted
+  if (ticket.data.resolution_submitted) {
+    return true;
+  }
+
+  // Check if resolution details exist and are not empty/default
+  const resolution = ticket.data.resolution_details;
+  return resolution &&
+         resolution.trim() &&
+         resolution.trim() !== '<p></p>' &&
+         resolution.trim() !== '';
+});
+
+const canRejectResolution = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // Only allow rejection if ticket is Resolved or Closed with resolution
+  if (ticket.data.status !== 'Resolved' && ticket.data.status !== 'Closed') {
+    return false;
+  }
+
+  // Must have resolution to reject and it must have been submitted at least once
+  if (!ticket.data.resolution_details || !ticket.data.resolution_details.trim()) {
+    return false;
+  }
+  
+  if (!ticket.data.resolution_ever_submitted) {
+    return false;
+  }
+
+  // User can reject if they are the raised_by user
+  if (ticket.data.raised_by === currentUserId.value) {
+    return true;
+  }
+
+  return false;
+});
+
+const canReopenTicket = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+
+  // Only allow reopening of closed or resolved tickets without resolution
+  if (ticket.data.status !== 'Closed' && ticket.data.status !== 'Resolved') {
+    return false;
+  }
+
+  // If there's a resolution, use reject resolution instead
+  if (ticket.data.resolution_details && ticket.data.resolution_details.trim()) {
+    return false;
+  }
+
+  // User can reopen if they are the raised_by user
+  if (ticket.data.raised_by === currentUserId.value) {
+    return true;
+  }
+
   return false;
 });
 
@@ -513,6 +599,150 @@ function triggerRequestClosure() {
   });
 }
 
+function triggerRejectResolution() {
+  $dialog({
+    title: "Reject Resolution",
+    message: "Please explain why this resolution doesn't solve your issue.",
+    actions: [],
+    render: ({ close }) => {
+      const reason = ref("");
+      const isLoading = ref(false);
+      const error = ref("");
+
+      return h("div", { class: "flex flex-col gap-3" }, [
+        error.value && h("div", {
+          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+        }, error.value),
+        h("div", { class: "text-sm text-gray-600 mb-2" }, "Explain why the provided resolution doesn't solve your issue."),
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "The resolution provided doesn't solve my issue because...",
+          rows: 4,
+          modelValue: reason.value,
+          "onUpdate:modelValue": (v: string) => {
+            reason.value = v;
+            error.value = "";
+          },
+        }),
+        h("div", { class: "flex gap-2 justify-end" }, [
+          h(
+            Button,
+            {
+              variant: "subtle",
+              label: "Cancel",
+              onClick: close,
+            },
+            {}
+          ),
+          h(
+            Button,
+            {
+              variant: "solid",
+              theme: "red",
+              label: "Reject Resolution",
+              loading: isLoading.value,
+              onClick: async () => {
+                if (!reason.value.trim()) {
+                  error.value = "Please provide a reason for rejection";
+                  return;
+                }
+
+                try {
+                  isLoading.value = true;
+                  await call("pw_helpdesk.customizations.ticket_closure_workflow.reject_resolution", {
+                    ticket_id: props.ticketId,
+                    rejection_reason: reason.value,
+                  });
+                  toast.success("Resolution rejected and ticket reopened");
+                  ticket.reload();
+                  close();
+                } catch (err) {
+                  error.value = err.message || "Failed to reject resolution";
+                } finally {
+                  isLoading.value = false;
+                }
+              },
+            },
+            {}
+          ),
+        ]),
+      ]);
+    },
+  });
+}
+
+function triggerReopen() {
+  $dialog({
+    title: "Reopen Ticket",
+    message: "Please provide a reason for reopening this ticket.",
+    actions: [],
+    render: ({ close }) => {
+      const reason = ref("");
+      const isLoading = ref(false);
+      const error = ref("");
+
+      return h("div", { class: "flex flex-col gap-3" }, [
+        error.value && h("div", {
+          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+        }, error.value),
+        h("div", { class: "text-sm text-gray-600 mb-2" }, "Explain why this ticket needs to be reopened."),
+        h(FormControl, {
+          type: "textarea",
+          placeholder: "The resolution provided doesn't solve my issue because...",
+          rows: 4,
+          modelValue: reason.value,
+          "onUpdate:modelValue": (v: string) => {
+            reason.value = v;
+            error.value = "";
+          },
+        }),
+        h("div", { class: "flex gap-2 justify-end" }, [
+          h(
+            Button,
+            {
+              variant: "subtle",
+              label: "Cancel",
+              onClick: close,
+            },
+            {}
+          ),
+          h(
+            Button,
+            {
+              variant: "solid",
+              theme: "blue",
+              label: "Reopen Ticket",
+              loading: isLoading.value,
+              onClick: async () => {
+                if (!reason.value.trim()) {
+                  error.value = "Please provide a reason for reopening";
+                  return;
+                }
+
+                try {
+                  isLoading.value = true;
+                  await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.reopen_ticket", {
+                    ticket_id: props.ticketId,
+                    reopen_reason: reason.value,
+                  });
+                  toast.success("Ticket reopened successfully");
+                  ticket.reload();
+                  close();
+                } catch (err) {
+                  error.value = err.message || "Failed to reopen ticket";
+                } finally {
+                  isLoading.value = false;
+                }
+              },
+            },
+            {}
+          ),
+        ]),
+      ]);
+    },
+  });
+}
+
 const setValue = createResource({
   url: "frappe.client.set_value",
   debounce: 300,
@@ -539,18 +769,27 @@ const breadcrumbs = computed(() => {
   return items;
 });
 
-const tabs = [
-  {
-    name: "conversation",
-    label: "Conversation",
-    icon: ActivityIcon,
-  },
-  {
-    name: "resolution",
-    label: "Resolution",
-    icon: TicketIcon,
-  },
-];
+const tabs = computed(() => {
+  const baseTabs = [
+    {
+      name: "conversation",
+      label: "Conversation",
+      icon: ActivityIcon,
+    },
+  ];
+  
+  // Only show Resolution tab if ticket has been replied to or is in later stages
+  const allowedStatuses = ["Replied", "Resolved", "Closed", "Reopened"];
+  if (ticket.data && allowedStatuses.includes(ticket.data.status)) {
+    baseTabs.push({
+      name: "resolution",
+      label: "Resolution",
+      icon: TicketIcon,
+    });
+  }
+  
+  return baseTabs;
+});
 
 const showEditor = computed(() => ticket.data.status !== "Closed");
 

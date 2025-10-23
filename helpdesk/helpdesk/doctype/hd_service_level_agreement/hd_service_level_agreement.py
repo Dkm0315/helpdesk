@@ -171,9 +171,27 @@ class HDServiceLevelAgreement(Document):
     def handle_doc_status(self, doc: Document):
         if doc.is_new() or not doc.has_value_changed("status"):
             return
+        self.handle_reopened_status(doc)
         self.set_first_response_time(doc)
         self.set_resolution_date(doc)
         self.set_hold_time(doc)
+
+    def handle_reopened_status(self, doc: Document):
+        """Handle when ticket is reopened - reset resolution state but keep response state"""
+        if doc.status != "Reopened":
+            return
+
+        # Reset resolution-related fields but preserve first response data
+        doc.resolution_date = None
+        doc.resolution_time = None
+        doc.user_resolution_time = None
+
+        # Reset hold time for fresh SLA calculation
+        doc.on_hold_since = None
+        doc.total_hold_time = 0
+
+        # Reset SLA creation time to restart the SLA clock
+        doc.service_level_agreement_creation = now_datetime()
 
     def set_first_response_time(self, doc: Document):
         start_at = doc.service_level_agreement_creation
@@ -195,7 +213,11 @@ class HDServiceLevelAgreement(Document):
         end_at = doc.resolution_date
         time_took = self.calc_elapsed_time(start_at, end_at)
         time_hold = doc.total_hold_time or 0
-        time_took_effective = time_took - time_hold
+        
+        # Add accumulated time from previous resolution attempts if exists
+        accumulated_time = getattr(doc, 'custom_accumulated_resolution_time', 0) or 0
+        
+        time_took_effective = time_took - time_hold + accumulated_time
         doc.resolution_time = time_took_effective
 
     def set_hold_time(self, doc: Document):
@@ -254,7 +276,16 @@ class HDServiceLevelAgreement(Document):
         was_fulfilled = prev_state in fullfill_on
         is_paused = next_state in pause_on
         is_fulfilled = next_state in fullfill_on
-        is_open = not is_paused and not is_fulfilled
+        is_reopened = next_state == "Reopened"
+        is_open = not is_paused and not is_fulfilled and not is_reopened
+
+        # Reset metrics when transitioning from closed/resolved to reopened
+        if is_reopened and (was_paused or was_fulfilled):
+            doc.resolution_date = None
+            doc.resolution_time = None
+            doc.user_resolution_time = None
+            return
+
         if is_open and (was_paused or was_fulfilled):
             return
         doc.response_date = None
@@ -263,6 +294,17 @@ class HDServiceLevelAgreement(Document):
 
     def handle_agreement_status(self, doc: Document):
         is_failed = self.is_first_response_failed(doc) or self.is_resolution_failed(doc)
+
+        # For reopened tickets, determine status based on current state
+        if doc.status == "Reopened":
+            if not doc.first_responded_on:
+                doc.agreement_status = "First Response Due"
+            elif self.apply_sla_for_resolution:
+                doc.agreement_status = "Resolution Due"
+            else:
+                doc.agreement_status = "Fulfilled"
+            return
+
         options = {
             "Fulfilled": True,
             "Resolution Due": self.apply_sla_for_resolution and not doc.resolution_date,
