@@ -49,17 +49,39 @@
             </Button>
           </template>
         </Dropdown>
-        <Button
-          v-if="canRejectResolution"
-          label="Reject Resolution"
-          theme="red"
-          variant="outline"
-          @click="triggerRejectResolution()"
-        >
-          <template #prefix>
-            <Icon icon="lucide:x-circle" />
-          </template>
-        </Button>
+        <!-- Resolution Satisfaction Controls -->
+        <div v-if="showResolutionSatisfactionControls" class="flex items-center gap-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg max-w-md">
+          <div class="flex items-center gap-2 flex-1">
+            <Icon icon="lucide:help-circle" class="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <span class="text-sm text-blue-900 font-medium">Is this resolution satisfactory?</span>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <Button
+              v-if="canMarkSatisfied"
+              label="Yes"
+              theme="green"
+              variant="solid"
+              class="text-xs px-3 py-1.5"
+              @click="triggerMarkSatisfied()"
+            >
+              <template #prefix>
+                <Icon icon="lucide:thumbs-up" class="h-3 w-3" />
+              </template>
+            </Button>
+            <Button
+              v-if="canRejectResolution"
+              label="No"
+              theme="red"
+              variant="outline"
+              class="text-xs px-3 py-1.5"
+              @click="triggerRejectResolution()"
+            >
+              <template #prefix>
+                <Icon icon="lucide:thumbs-down" class="h-3 w-3" />
+              </template>
+            </Button>
+          </div>
+        </div>
         <div class="relative">
           <Button
             v-if="canCloseTicket && ticket.data.status !== 'Closed'"
@@ -452,6 +474,36 @@ const canRejectResolution = computed(() => {
   return false;
 });
 
+const canMarkSatisfied = computed(() => {
+  if (!ticket.data || !currentUserId.value) return false;
+  // Only allow marking satisfied if ticket status is Resolved
+  if (ticket.data.status !== 'Resolved') {
+    return false;
+  }
+  // Must have resolution that was submitted
+  if (!ticket.data.resolution_details || !ticket.data.resolution_details.trim()) {
+    return false;
+  }
+  if (!ticket.data.resolution_ever_submitted) {
+    return false;
+  }
+  // Check if resolution is not already marked as satisfied by checking history
+  // For now, allow marking satisfied if ticket is in Resolved status
+  // User can mark satisfied if they are the raised_by user
+  if (ticket.data.raised_by === currentUserId.value) {
+    return true;
+  }
+  return false;
+});
+
+const showResolutionSatisfactionControls = computed(() => {
+  // Only show if user can perform satisfaction actions and ticket has resolution
+  return (canRejectResolution.value || canMarkSatisfied.value) &&
+         ticket.data &&
+         ticket.data.status === 'Resolved' &&
+         ticket.data.resolution_details;
+});
+
 const handleRename = () => {
   if (renameSubject.value === ticket.data?.subject) return;
   updateTicket("subject", renameSubject.value);
@@ -799,7 +851,7 @@ function triggerRejectResolution() {
 
                 try {
                   isLoading.value = true;
-                  await call("pw_helpdesk.customizations.ticket_closure_workflow.reject_resolution", {
+                  await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.reject_resolution", {
                     ticket_id: props.ticketId,
                     rejection_reason: reason.value,
                   });
@@ -819,6 +871,20 @@ function triggerRejectResolution() {
       ]);
     },
   });
+}
+
+async function triggerMarkSatisfied() {
+  try {
+    await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.mark_resolution_satisfied", {
+      ticket_id: props.ticketId,
+    });
+
+    toast.success("Resolution marked as satisfied");
+    ticket.reload();
+  } catch (error) {
+    console.error('Error marking resolution as satisfied:', error);
+    toast.error(error.message || "Failed to mark resolution as satisfied");
+  }
 }
 
 async function triggerRequestClosure() {

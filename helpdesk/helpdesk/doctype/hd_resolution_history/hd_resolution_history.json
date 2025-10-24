@@ -1,0 +1,182 @@
+{
+ "actions": [],
+ "allow_copy": 0,
+ "allow_events_in_timeline": 0,
+ "allow_guest_to_view": 0,
+ "allow_import": 0,
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "beta": 0,
+ "creation": "2024-01-01 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "ticket",
+  "version_number",
+  "resolution_content",
+  "column_break_5",
+  "submitted_by",
+  "submitted_on",
+  "satisfaction_section",
+  "satisfaction_status",
+  "satisfaction_by",
+  "column_break_10",
+  "satisfaction_on",
+  "rejection_reason",
+  "section_break_13",
+  "is_current_version"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "RES-HIST-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Ticket",
+   "options": "HD Ticket",
+   "reqd": 1
+  },
+  {
+   "fieldname": "version_number",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Version Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "resolution_content",
+   "fieldtype": "Text Editor",
+   "label": "Resolution Content",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "submitted_by",
+   "fieldtype": "Link",
+   "label": "Submitted By",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "submitted_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Submitted On",
+   "reqd": 1
+  },
+  {
+   "fieldname": "satisfaction_section",
+   "fieldtype": "Section Break",
+   "label": "Satisfaction Tracking"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "satisfaction_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Satisfaction Status",
+   "options": "Pending\nSatisfied\nNot Satisfied",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.satisfaction_status != 'Pending'",
+   "fieldname": "satisfaction_by",
+   "fieldtype": "Link",
+   "label": "Satisfaction Marked By",
+   "options": "User"
+  },
+  {
+   "fieldname": "column_break_10",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.satisfaction_status != 'Pending'",
+   "fieldname": "satisfaction_on",
+   "fieldtype": "Datetime",
+   "label": "Satisfaction Marked On"
+  },
+  {
+   "depends_on": "eval:doc.satisfaction_status == 'Not Satisfied'",
+   "fieldname": "rejection_reason",
+   "fieldtype": "Long Text",
+   "label": "Rejection Reason"
+  },
+  {
+   "fieldname": "section_break_13",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": 0,
+   "fieldname": "is_current_version",
+   "fieldtype": "Check",
+   "label": "Is Current Version"
+  }
+ ],
+ "has_web_view": 0,
+ "hide_heading": 0,
+ "hide_toolbar": 0,
+ "idx": 0,
+ "image_view": 0,
+ "in_create": 0,
+ "is_submittable": 0,
+ "issingle": 0,
+ "istable": 0,
+ "max_attachments": 0,
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Helpdesk",
+ "name": "HD Resolution History",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HD Agent",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Customer"
+  }
+ ],
+ "quick_entry": 0,
+ "read_only": 0,
+ "read_only_onload": 0,
+ "show_name_in_global_search": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "ticket",
+ "track_changes": 1,
+ "track_seen": 0,
+ "track_views": 0
+}

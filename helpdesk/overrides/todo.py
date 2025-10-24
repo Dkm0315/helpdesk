@@ -16,16 +16,21 @@ def after_insert(doc, method=None):
     # The default assignment creates TODOs with descriptions like "Automatic Assignment" or similar
     # We want to update it to be more specific for helpdesk tickets
     try:
-        ticket_number = doc.reference_name
-        new_description = f"Ticket {ticket_number} has been assigned to you"
+        # Use the subject as the description
+        if doc.subject:
+            new_description = doc.subject
+        else:
+            # Fallback if no subject exists
+            ticket_number = doc.reference_name
+            new_description = f"Ticket {ticket_number} has been assigned to you"
 
         # Only update if the current description is generic/default
         # This prevents overwriting user-customized descriptions
         if doc.description and any(keyword in doc.description.lower() for keyword in ["automatic", "assignment", "assigned"]):
-            # Update the description
+            # Update the description to match the subject
             frappe.db.set_value("ToDo", doc.name, "description", new_description, update_modified=False)
         elif not doc.description:
-            # If no description exists, set our custom one
+            # If no description exists, set it to match the subject
             frappe.db.set_value("ToDo", doc.name, "description", new_description, update_modified=False)
 
     except Exception as e:

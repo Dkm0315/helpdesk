@@ -43,6 +43,8 @@
   "resolution_submitted",
   "resolution_submitted_on",
   "resolution_ever_submitted",
+  "resolution_satisfaction_status",
+  "current_resolution_version",
   "column_break1",
   "opening_date",
   "opening_time",
@@ -286,6 +288,22 @@
    "fieldtype": "Check",
    "label": "Resolution Ever Submitted",
    "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "depends_on": "eval:!doc.__islocal && doc.resolution_ever_submitted",
+   "fieldname": "resolution_satisfaction_status",
+   "fieldtype": "Select",
+   "label": "Resolution Satisfaction Status",
+   "options": "Pending\nSatisfied\nNot Satisfied",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:!doc.__islocal && doc.resolution_ever_submitted",
+   "fieldname": "current_resolution_version",
+   "fieldtype": "Int",
+   "label": "Current Resolution Version",
    "read_only": 1
   },
   {

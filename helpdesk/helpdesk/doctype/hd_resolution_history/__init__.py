@@ -1,0 +1,1 @@
+# HD Resolution History DocType

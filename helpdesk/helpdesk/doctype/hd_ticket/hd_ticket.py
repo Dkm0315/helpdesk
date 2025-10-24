@@ -72,8 +72,62 @@ class HDTicket(Document):
         self.apply_sla()
         if not self.is_new():
             self.handle_ticket_activity_update()
+            self.handle_resolution_submission()
 
         self.handle_email_feedback()
+
+    def handle_resolution_submission(self):
+        """
+        Handle resolution submission and create resolution history entries
+        """
+        # Check if resolution was just submitted
+        if (
+            self.has_value_changed("resolution_submitted")
+            and self.resolution_submitted
+            and self.resolution_details
+        ):
+            self.create_resolution_history_entry()
+
+    def create_resolution_history_entry(self):
+        """
+        Create a new resolution history entry when resolution is submitted
+        Note: This is optional and will fail gracefully if HD Resolution History doctype doesn't exist
+        """
+        try:
+            # Check if HD Resolution History doctype exists
+            if not frappe.db.exists("DocType", "HD Resolution History"):
+                return  # Skip if doctype doesn't exist yet
+
+            # Check if a history entry already exists for this submission
+            existing_entry = frappe.db.exists(
+                "HD Resolution History",
+                {
+                    "ticket": self.name,
+                    "is_current_version": 1,
+                    "submitted_on": self.resolution_submitted_on
+                }
+            )
+
+            if existing_entry:
+                return  # Don't create duplicate entries
+
+            # Create new resolution history entry
+            resolution_history = frappe.get_doc({
+                "doctype": "HD Resolution History",
+                "ticket": self.name,
+                "resolution_content": self.resolution_details,
+                "submitted_by": frappe.session.user,
+                "submitted_on": self.resolution_submitted_on or frappe.utils.now_datetime(),
+                "satisfaction_status": "Pending",
+                "is_current_version": 1
+            })
+
+            resolution_history.insert(ignore_permissions=True)
+
+        except Exception as e:
+            # Fail silently if resolution history can't be created
+            # This allows the ticket to still be saved even if history fails
+            pass
 
     def handle_email_feedback(self):
 

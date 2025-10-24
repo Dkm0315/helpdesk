@@ -26,12 +26,30 @@
               </div>
             </div>
             <div v-if="canRejectResolution" class="mt-4 pt-3 border-t border-green-200">
-              <Button
-                label="Reject Resolution"
-                variant="outline"
-                theme="red"
-                @click="showRejectDialog = true"
-              />
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex flex-col gap-3">
+                  <div class="flex items-center gap-2">
+                    <Icon icon="lucide:help-circle" class="h-5 w-5 text-blue-600" />
+                    <span class="text-sm font-medium text-blue-900">Is this resolution satisfactory?</span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <button
+                      @click="markSatisfied"
+                      class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium text-sm rounded-lg transition-colors"
+                    >
+                      <Icon icon="lucide:thumbs-up" class="h-4 w-4" />
+                      Yes, Satisfied
+                    </button>
+                    <button
+                      @click="showRejectDialog = true"
+                      class="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 hover:bg-red-50 font-medium text-sm rounded-lg transition-colors"
+                    >
+                      <Icon icon="lucide:thumbs-down" class="h-4 w-4" />
+                      No, Needs Work
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -212,6 +230,19 @@ async function submitResolution() {
   }
 }
 
+async function markSatisfied() {
+  try {
+    await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.mark_resolution_satisfied", {
+      ticket_id: props.ticketId,
+    });
+
+    toast.success("Resolution marked as satisfied");
+    emit("update");
+  } catch (err) {
+    toast.error(err.message || "Failed to mark resolution as satisfied");
+  }
+}
+
 async function rejectResolution() {
   if (!rejectionReason.value.trim()) {
     rejectionError.value = "Please provide a reason for rejection";
@@ -222,7 +253,7 @@ async function rejectResolution() {
     isRejecting.value = true;
     rejectionError.value = "";
 
-    await call("pw_helpdesk.customizations.ticket_closure_workflow.reject_resolution", {
+    await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.reject_resolution", {
       ticket_id: props.ticketId,
       rejection_reason: rejectionReason.value,
     });

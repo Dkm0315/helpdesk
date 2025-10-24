@@ -424,7 +424,7 @@ async function triggerClose() {
 
                 try {
                   isLoading.value = true;
-                  await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
+                  await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.mark_as_resolved", {
                     ticket_id: props.ticketId,
                     resolution_notes: notes.value,
                   });
@@ -506,7 +506,7 @@ Notes: Any additional information...`);
 
                 try {
                   isLoading.value = true;
-                  await call("pw_helpdesk.customizations.ticket_closure_workflow.mark_as_resolved", {
+                  await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.mark_as_resolved", {
                     ticket_id: props.ticketId,
                     resolution_notes: resolutionDetails.value,
                   });
@@ -577,7 +577,7 @@ function triggerRequestClosure() {
 
                 try {
                   isLoading.value = true;
-                  await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+                  await call("helpdesk.helpdesk.doctype.hd_ticket.ticket_closure_workflow.request_closure", {
                     ticket_id: props.ticketId,
                     resolution_notes: notes.value,
                   });
