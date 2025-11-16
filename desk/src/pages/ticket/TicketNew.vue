@@ -34,6 +34,30 @@
           "
         />
       </div>
+      <!-- Raise For Others fields -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="flex flex-col gap-2">
+          <span class="block text-sm text-gray-700">
+            Raised For
+          </span>
+          <FormControl
+            v-model="custom_raised_for"
+            type="select"
+            :options="raisedForOptions"
+            placeholder="Select an option"
+            @change="onRaisedForChange"
+          />
+        </div>
+        <div v-if="custom_raised_for === 'Others'" class="flex flex-col gap-2">
+          <span class="block text-sm text-gray-700">
+            Employee
+          </span>
+          <EmployeeLink
+            :model-value="custom_raise_for_employee"
+            @update:model-value="(val) => onEmployeeChange(val)"
+          />
+        </div>
+      </div>
       <!-- category and subcategory fields -->
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="flex flex-col gap-2">
@@ -104,7 +128,7 @@
                 theme="gray"
                 variant="solid"
                 :disabled="
-                  $refs.editor.editor.isEmpty || ticket.loading || !subject
+                  ($refs.editor as any)?.editor?.isEmpty || ticket.loading || !subject
                 "
                 @click="() => ticket.submit()"
               />
@@ -128,7 +152,7 @@
               theme="gray"
               variant="solid"
               :disabled="
-                $refs.editor.editor.isEmpty || ticket.loading || !subject
+                ($refs.editor as any)?.editor?.isEmpty || ticket.loading || !subject
               "
               @click="() => ticket.submit()"
             />
@@ -141,6 +165,7 @@
 
 <script setup lang="ts">
 import { LayoutHeader, UniInput } from "@/components";
+import EmployeeLink from "../../components/ticket/EmployeeLink.vue";
 import {
   handleLinkFieldUpdate,
   handleSelectFieldUpdate,
@@ -163,7 +188,7 @@ import {
 import { useOnboarding } from "frappe-ui/frappe";
 import { isEmpty } from "lodash";
 import sanitizeHtml from "sanitize-html";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import SearchArticles from "../../components/SearchArticles.vue";
 import TicketTextEditor from "./TicketTextEditor.vue";
@@ -190,6 +215,13 @@ const custom_category = ref("");
 const custom_subcategory = ref("");
 const categoriesOptions = ref([]);
 const subcategoriesOptions = ref([]);
+// Raise For Others fields
+const custom_raised_for = ref("Myself");
+const custom_raise_for_employee = ref("");
+const raisedForOptions = [
+  { label: "Myself", value: "Myself" },
+  { label: "Others", value: "Others" },
+];
 
 const template = createResource({
   url: "helpdesk.helpdesk.doctype.hd_ticket_template.api.get_one",
@@ -239,8 +271,55 @@ const visibleFields = computed(() => {
   return _fields.map((field) => parseField(field, templateFields));
 });
 
+async function ensureEmployeeNameDisplay(employeeId: string) {
+  if (!employeeId) return;
+  
+  try {
+    // Fetch employee document to get employee_name
+    const employeeRes = await call("frappe.client.get", {
+      doctype: "Employee",
+      name: employeeId,
+    });
+    
+    if (employeeRes?.message) {
+      const employee = employeeRes.message;
+      const employeeName = employee.employee_name || employee.name;
+      
+      // Cache the link title using Frappe's link title cache mechanism
+      // This ensures the Vue Link component displays the name instead of ID
+      const frappeWindow = window as any;
+      if (frappeWindow.frappe?.utils?.add_link_title) {
+        frappeWindow.frappe.utils.add_link_title("Employee", employeeId, employeeName);
+      } else if (frappeWindow.frappe?.link_title_cache) {
+        // Fallback: directly set in cache if add_link_title doesn't exist
+        if (!frappeWindow.frappe.link_title_cache["Employee"]) {
+          frappeWindow.frappe.link_title_cache["Employee"] = {};
+        }
+        frappeWindow.frappe.link_title_cache["Employee"][employeeId] = employeeName;
+      }
+      
+      // Trigger search_link API call to ensure the Link component refreshes
+      // This will use the cached title or fetch it from the server
+      await call("frappe.desk.search.search_link", {
+        doctype: "Employee",
+        txt: employeeId,
+        filters: {},
+        page_length: 1,
+      });
+    }
+  } catch (error) {
+    console.warn("Error loading employee name:", error);
+  }
+}
+
 function handleOnFieldChange(e: any, fieldname: string, fieldtype: string) {
   templateFields[fieldname] = e.value;
+  
+  // Handle employee field change to ensure name is displayed
+  if (fieldname === "custom_raise_for_employee" && e.value) {
+    ensureEmployeeNameDisplay(e.value);
+  }
+  
   const fieldDependentFns = customOnChange.value?.[fieldname];
   if (fieldDependentFns) {
     fieldDependentFns.forEach((fn: Function) => {
@@ -259,6 +338,10 @@ const ticket = createResource({
       template: props.templateId,
       custom_category: custom_category.value,
       custom_subcategory: custom_subcategory.value,
+      custom_raised_for: custom_raised_for.value,
+      custom_raise_for_employee: custom_raise_for_employee.value,
+      custom_for_myself: custom_raised_for.value === "Myself" ? 1 : 0,
+      custom_for_others: custom_raised_for.value === "Others" ? 1 : 0,
       ...templateFields,
     },
     attachments: attachments.value,
@@ -339,6 +422,19 @@ async function loadCategories() {
   }
 }
 
+function onRaisedForChange() {
+  if (custom_raised_for.value === "Myself") {
+    custom_raise_for_employee.value = "";
+  }
+}
+
+async function onEmployeeChange(employeeId: string) {
+  custom_raise_for_employee.value = employeeId;
+  if (employeeId) {
+    await ensureEmployeeNameDisplay(employeeId);
+  }
+}
+
 async function onCategoryChange() {
   custom_subcategory.value = "";
   subcategoriesOptions.value = [];
@@ -359,6 +455,17 @@ async function onCategoryChange() {
   }
 }
 
+// Watch for employee field changes to ensure name is displayed
+watch(
+  () => custom_raise_for_employee.value,
+  (newValue) => {
+    if (newValue) {
+      ensureEmployeeNameDisplay(newValue);
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   capture("new_ticket_page", {
     data: {
@@ -366,5 +473,10 @@ onMounted(() => {
     },
   });
   loadCategories();
+  
+  // Ensure employee name is displayed if field already has a value
+  if (custom_raise_for_employee.value) {
+    ensureEmployeeNameDisplay(custom_raise_for_employee.value);
+  }
 });
 </script>

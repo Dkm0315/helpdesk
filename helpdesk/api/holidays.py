@@ -196,7 +196,7 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
         if not check_date:
             check_date = today()
         else:
-            check_date = getdate(check_date)
+        check_date = getdate(check_date)
         
         print(f"[HOLIDAY FILTER] Using check_date: {check_date}")
         
@@ -243,8 +243,8 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
         print(f"[HOLIDAY FILTER] Found {len(holidays)} holidays for date {check_date}")
         
         # Check each holiday to see if user belongs to any Dynamic User Assignment in official_location
-        for holiday in holidays:
-            try:
+            for holiday in holidays:
+                try:
                 print(f"[HOLIDAY FILTER] Checking holiday: {holiday.name}")
                 holiday_doc = frappe.get_doc("Holidays", holiday.name)
                 
@@ -260,7 +260,7 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
                     # Get the dynamic_user_assignment from Assignment Group
                     dynamic_user_assignment_id = getattr(loc, 'dynamic_user_assignment', None)
                     print(f"[HOLIDAY FILTER] Assignment Group -> dynamic_user_assignment: {dynamic_user_assignment_id}")
-                    
+                
                     if not dynamic_user_assignment_id:
                         continue
                     
