@@ -171,9 +171,10 @@ def save_assignment_rule(data):
                         doc.append("users", {"user": user_id})
                         seen_users.add(user_id)
 
-        # Add users from all dynamic assignments
+        # Add users from all dynamic assignments (filtered by leave/holidays)
         for assignment_id in dynamic_assignment_ids:
-            for user in get_users_for_assignment(assignment_id) or []:
+            # Pass assignment rule name to filter users
+            for user in get_users_for_assignment(assignment_id, assignment_rule_name=name or doc.name) or []:
                 user_id = user.get("email") or user.get("user")
                 if user_id and user_id not in seen_users:
                     doc.append("users", {"user": user_id})

@@ -46,8 +46,8 @@ def apply_assignment(assignment_id):
         frappe.log_error(f"Error applying dynamic user assignment: {str(e)}")
         frappe.throw(_("Error applying assignment: {0}").format(str(e)))
 
-def get_users_for_assignment(assignment_id):
-    """Get users based on Dynamic User Assignment conditions"""
+def get_users_for_assignment(assignment_id, assignment_rule_name=None, check_date=None):
+    """Get users based on Dynamic User Assignment conditions, excluding users on leave/holidays"""
     try:
         assignment = frappe.get_doc("Dynamic User Assignment", assignment_id)
         
@@ -55,8 +55,12 @@ def get_users_for_assignment(assignment_id):
         users = []
         if hasattr(assignment, 'assigned_users'):
             for assigned_user in assignment.assigned_users:
-                # Check both user and user_id fields for compatibility
-                user_email = assigned_user.user_id or assigned_user.user
+                # Get user_id from the child table (AssignedUsers only has user_id, not user)
+                user_email = getattr(assigned_user, 'user_id', None)
+                if not user_email:
+                    # Fallback: try to get user if it exists (for backward compatibility)
+                    user_email = getattr(assigned_user, 'user', None)
+                
                 if user_email:
                     try:
                         user = frappe.get_doc("User", user_email)
@@ -74,6 +78,11 @@ def get_users_for_assignment(assignment_id):
                             "user_image": None,
                             "email": user_email
                         })
+        
+        # Filter users based on leave/holidays if assignment_rule_name is provided
+        if assignment_rule_name and users:
+            from helpdesk.api.holidays import filter_users_for_assignment
+            users = filter_users_for_assignment(users, assignment_rule_name, check_date)
         
         return users
     except Exception as e:
