@@ -152,32 +152,22 @@ def get_user_round_robin_filtered(self):
                 user_to_obj_map[user_email] = frappe._dict({'user': user_email})
     
     if not all_users:
-        print(f"[ASSIGNMENT RULE] Round Robin - No users found for rule {self.name}")
         return None
-    
-    print(f"[ASSIGNMENT RULE] Round Robin - Found {len(all_users)} total users for rule {self.name}: {all_users}")
     
     # Filter users based on leave/holidays - exclude users on leave or holidays
     available_users = []
     for user in all_users:
-        print(f"[ASSIGNMENT RULE] Round Robin - Checking if user {user} should be excluded")
         if not should_exclude_user_from_assignment(user, assignment_rule_name=self.name, check_date=check_date):
-            print(f"[ASSIGNMENT RULE] Round Robin - User {user} is AVAILABLE (not excluded)")
             available_users.append(user)
-        else:
-            print(f"[ASSIGNMENT RULE] Round Robin - User {user} is EXCLUDED (has holiday/leave)")
     
     # If no users available after filtering, log warning but don't assign
     if not available_users:
-        print(f"[ASSIGNMENT RULE] Round Robin - No available users after filtering for rule {self.name}")
         frappe.log_error(
             f"No available users after filtering for assignment rule {self.name}. All users are on leave/holiday.",
             "Assignment Rule Filtering"
         )
         # Return None to prevent assignment
         return None
-    
-    print(f"[ASSIGNMENT RULE] Round Robin - {len(available_users)} users available after filtering: {available_users}")
     
     # Get filtered user objects (preserve order for round robin)
     filtered_user_objects = []
@@ -191,7 +181,6 @@ def get_user_round_robin_filtered(self):
     # first time, or last in list, pick the first
     if not self.last_user or self.last_user == filtered_user_objects[-1].user:
         selected_user = filtered_user_objects[0].user
-        print(f"[ASSIGNMENT RULE] Round Robin - Selected user: {selected_user}")
         return selected_user
     
     # find out the next user in the filtered list
@@ -244,32 +233,22 @@ def get_user_load_balancing_filtered(self):
                 all_users.append(user_email)
     
     if not all_users:
-        print(f"[ASSIGNMENT RULE] Load Balancing - No users found for rule {self.name}")
         return None
-    
-    print(f"[ASSIGNMENT RULE] Load Balancing - Found {len(all_users)} total users for rule {self.name}: {all_users}")
     
     # Filter users based on leave/holidays - exclude users on leave or holidays
     available_users = []
     for user in all_users:
-        print(f"[ASSIGNMENT RULE] Load Balancing - Checking if user {user} should be excluded")
         if not should_exclude_user_from_assignment(user, assignment_rule_name=self.name, check_date=check_date):
-            print(f"[ASSIGNMENT RULE] Load Balancing - User {user} is AVAILABLE (not excluded)")
             available_users.append(user)
-        else:
-            print(f"[ASSIGNMENT RULE] Load Balancing - User {user} is EXCLUDED (has holiday/leave)")
     
     # If no users available after filtering, log warning but don't assign
     if not available_users:
-        print(f"[ASSIGNMENT RULE] Load Balancing - No available users after filtering for rule {self.name}")
         frappe.log_error(
             f"No available users after filtering for assignment rule {self.name}. All users are on leave/holiday.",
             "Assignment Rule Filtering"
         )
         # Return None to prevent assignment
         return None
-    
-    print(f"[ASSIGNMENT RULE] Load Balancing - {len(available_users)} users available after filtering: {available_users}")
     
     # Calculate load for each available user
     counts = [
@@ -291,7 +270,6 @@ def get_user_load_balancing_filtered(self):
     
     # pick the first user
     selected_user = sorted_counts[0].get("user") if sorted_counts else None
-    print(f"[ASSIGNMENT RULE] Load Balancing - Selected user: {selected_user} (load counts: {counts})")
     return selected_user
 
 
