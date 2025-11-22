@@ -196,11 +196,14 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
         else:
             check_date = getdate(check_date)
         
+        print(f"[HOLIDAY DEBUG] Checking exclusion for user: {user}, date: {check_date}, rule: {assignment_rule_name}")
+        
         # 1. Check leave applications
         # Get employee for the user
         employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
         
         if employee:
+            print(f"[HOLIDAY DEBUG] User {user} has employee: {employee}")
             # Check for leave applications (submitted/approved) for this employee
             leave_applications = frappe.get_all(
                 "Leave Application",
@@ -209,17 +212,23 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
                     "status": ["in", ["Open", "Approved"]],
                     "docstatus": ["<", 2],  # Not cancelled
                 },
-                fields=["from_date", "to_date"],
+                fields=["name", "from_date", "to_date", "status"],
             )
+            
+            print(f"[HOLIDAY DEBUG] Found {len(leave_applications)} leave applications for employee {employee}")
             
             # Check if check_date falls within any leave application date range
             for leave in leave_applications:
                 if leave.from_date and leave.to_date:
                     leave_from = getdate(leave.from_date)
                     leave_to = getdate(leave.to_date)
+                    print(f"[HOLIDAY DEBUG] Checking leave {leave.name}: {leave_from} to {leave_to}")
                     if leave_from <= check_date <= leave_to:
                         # User is on leave for this date - exclude them
+                        print(f"[HOLIDAY DEBUG] EXCLUDED: User {user} is on leave ({leave.name})")
                         return True
+        else:
+            print(f"[HOLIDAY DEBUG] No employee found for user {user}")
         
         # 2. Check holidays
         # Fetch ALL holidays for the check date
@@ -229,19 +238,27 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
             fields=["name"]
         )
         
+        print(f"[HOLIDAY DEBUG] Found {len(holidays)} holidays on {check_date}")
+        
         # Check each holiday to see if user belongs to any Dynamic User Assignment in official_location
         for holiday in holidays:
             try:
                 holiday_doc = frappe.get_doc("Holidays", holiday.name)
+                print(f"[HOLIDAY DEBUG] Checking holiday: {holiday.name}")
                 
                 # If holiday has no official_location, skip it
                 if not hasattr(holiday_doc, 'official_location') or not holiday_doc.official_location:
+                    print(f"[HOLIDAY DEBUG] Holiday {holiday.name} has no official_location, skipping")
                     continue
+                
+                print(f"[HOLIDAY DEBUG] Holiday {holiday.name} has {len(holiday_doc.official_location)} official locations")
                 
                 # For each Assignment Group in official_location
                 for loc in holiday_doc.official_location:
                     # Get the dynamic_user_assignment from Assignment Group
                     dynamic_user_assignment_id = getattr(loc, 'dynamic_user_assignment', None)
+                    assignment_group = getattr(loc, 'assignment_group', None)
+                    print(f"[HOLIDAY DEBUG] Location: {assignment_group}, Dynamic Assignment: {dynamic_user_assignment_id}")
                 
                     if not dynamic_user_assignment_id:
                         continue
@@ -249,30 +266,43 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
                     try:
                         # Get the Dynamic User Assignment document
                         dynamic_assignment = frappe.get_doc("Dynamic User Assignment", dynamic_user_assignment_id)
+                        print(f"[HOLIDAY DEBUG] Checking Dynamic Assignment {dynamic_user_assignment_id} for user {user}")
                         
                         # Check if user is in this Dynamic User Assignment's assigned_users
                         if hasattr(dynamic_assignment, 'assigned_users') and dynamic_assignment.assigned_users:
+                            assigned_user_ids = []
                             for assigned_user in dynamic_assignment.assigned_users:
                                 # Check user_id field (AssignedUsers table has user_id, not user)
                                 user_id = getattr(assigned_user, 'user_id', None)
+                                if user_id:
+                                    assigned_user_ids.append(user_id)
                                 if user_id == user:
                                     # User is in a Dynamic User Assignment that has a holiday today - exclude them
+                                    print(f"[HOLIDAY DEBUG] EXCLUDED: User {user} is in Dynamic Assignment {dynamic_user_assignment_id} which has holiday {holiday.name}")
                                     return True
+                            print(f"[HOLIDAY DEBUG] Dynamic Assignment {dynamic_user_assignment_id} has users: {assigned_user_ids}")
                     except Exception as e:
                         # If Dynamic User Assignment doesn't exist or can't be loaded, log and continue
-                        frappe.log_error(f"Error loading Dynamic User Assignment {dynamic_user_assignment_id}: {str(e)}")
+                        error_msg = f"Error loading Dynamic User Assignment {dynamic_user_assignment_id}: {str(e)}"
+                        print(f"[HOLIDAY DEBUG] ERROR: {error_msg}")
+                        frappe.log_error(error_msg, "Holiday Check Error")
                         continue
                         
             except Exception as e:
                 # If we can't load a holiday doc, log and continue
-                frappe.log_error(f"Error loading holiday {holiday.name}: {str(e)}")
+                error_msg = f"Error loading holiday {holiday.name}: {str(e)}"
+                print(f"[HOLIDAY DEBUG] ERROR: {error_msg}")
+                frappe.log_error(error_msg, "Holiday Check Error")
                 continue
         
         # User is not on leave and not in any Dynamic User Assignment with a holiday
+        print(f"[HOLIDAY DEBUG] User {user} is NOT excluded (no leave/holiday)")
         return False
         
     except Exception as e:
-        frappe.log_error(f"Error checking if user should be excluded: {str(e)}")
+        error_msg = f"Error checking if user should be excluded: {str(e)}"
+        print(f"[HOLIDAY DEBUG] ERROR: {error_msg}")
+        frappe.log_error(error_msg, "Holiday Check Error")
         # On error, don't exclude the user (fail open)
         return False
 
