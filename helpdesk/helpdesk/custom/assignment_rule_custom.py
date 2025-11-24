@@ -503,33 +503,31 @@ def do_assignment_filtered(self, doc):
         todo_doc.insert(ignore_permissions=True, ignore_links=True)
         _safe_debug_log(f"[ASSIGNMENT DEBUG] Created ToDo {todo_doc.name} for user {user}")
         
-        # Update _assign field on the document so frontend can display assignees
+        # Call update_in_reference to update _assign field on the document
+        # This is the standard Frappe way to update _assign from ToDo records
         try:
-            # Check if document exists before trying to update
-            if frappe.db.exists(doctype, name_str):
-                # Get current _assign value or create new list
-                doc = frappe.get_doc(doctype, name_str)
-                current_assign = []
-                if hasattr(doc, '_assign') and doc._assign:
-                    try:
-                        current_assign = frappe.parse_json(doc._assign) or []
-                    except:
-                        current_assign = []
-                
-                # Add new assignee if not already in list
-                if user not in current_assign:
-                    current_assign.append(user)
-                
-                # Update _assign field
-                frappe.db.set_value(doctype, name_str, "_assign", frappe.as_json(current_assign), update_modified=False)
-                _safe_debug_log(f"[ASSIGNMENT DEBUG] Updated _assign field for {doctype} {name_str} to {frappe.as_json(current_assign)}")
-                
-                # Also update assigned_to field if it exists
-                if frappe.get_meta(doctype).get_field("assigned_to"):
-                    frappe.db.set_value(doctype, name_str, "assigned_to", user)
-                    _safe_debug_log(f"[ASSIGNMENT DEBUG] Updated assigned_to field to {user}")
+            todo_doc.update_in_reference()
+            _safe_debug_log(f"[ASSIGNMENT DEBUG] Called update_in_reference for ToDo {todo_doc.name}")
         except Exception as e:
-            _safe_debug_log(f"[ASSIGNMENT DEBUG] Could not update _assign/assigned_to field: {str(e)}")
+            _safe_debug_log(f"[ASSIGNMENT DEBUG] Error calling update_in_reference: {str(e)}")
+            # Fallback: manually update _assign field
+            try:
+                if frappe.db.exists(doctype, name_str):
+                    # Get all open ToDo assignments for this document
+                    all_todos = frappe.get_all("ToDo", filters={
+                        "reference_type": doctype,
+                        "reference_name": name_str,
+                        "status": ("not in", ("Cancelled", "Closed")),
+                    }, fields=["allocated_to"])
+                    
+                    # Build _assign list from all open ToDo records
+                    assign_list = [todo.allocated_to for todo in all_todos if todo.allocated_to]
+                    
+                    # Update _assign field with the complete list
+                    frappe.db.set_value(doctype, name_str, "_assign", frappe.as_json(assign_list), update_modified=False)
+                    _safe_debug_log(f"[ASSIGNMENT DEBUG] Manually updated _assign field for {doctype} {name_str} to {frappe.as_json(assign_list)}")
+            except Exception as e2:
+                _safe_debug_log(f"[ASSIGNMENT DEBUG] Error manually updating _assign field: {str(e2)}")
         
         # set for reference in round robin
         self.db_set("last_user", user)
