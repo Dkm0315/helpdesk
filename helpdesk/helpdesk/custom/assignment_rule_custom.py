@@ -440,6 +440,15 @@ def do_assignment_filtered(self, doc):
     for existing in existing_assignments:
         _safe_debug_log(f"[ASSIGNMENT DEBUG]   - ToDo {existing.name}: {existing.allocated_to} (Rule: {existing.assignment_rule})")
     
+    # If ticket already has an assignment from a different rule, skip to prevent duplicate assignments
+    # Only clear and reassign if assignment is from the same rule (to update) or if no assignment exists
+    if existing_assignments:
+        # Check if any existing assignment is from a different rule
+        different_rule_assignments = [a for a in existing_assignments if a.assignment_rule and a.assignment_rule != self.name]
+        if different_rule_assignments:
+            _safe_debug_log(f"[ASSIGNMENT DEBUG] Skipping assignment - ticket already assigned via different rule(s): {[a.assignment_rule for a in different_rule_assignments]}")
+            return False
+    
     # Clear existing assignment (doc.get() works on Document objects)
     assign_to.clear(doctype, name_str, ignore_permissions=True)
     _safe_debug_log(f"[ASSIGNMENT DEBUG] Cleared existing assignments")
