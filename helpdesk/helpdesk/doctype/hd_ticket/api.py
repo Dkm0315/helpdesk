@@ -22,16 +22,55 @@ def new(doc, attachments=[]):
     
     # Ensure agent_group is set from category before insert
     # This ensures assignment hooks have agent_group available
+    # Use fallback method directly to avoid import issues on deployed sites
+    _set_agent_group_fallback(d)
+    
+    # Try to use pw_helpdesk function if available (for better logic)
     try:
         from pw_helpdesk.customizations.ticket_events import ensure_agent_group_from_category
         ensure_agent_group_from_category(d)
-        frappe.log_error(f"[TICKET API DEBUG] After ensure_agent_group_from_category, agent_group: {d.agent_group}, category: {d.custom_category}", "Ticket Creation Debug")
-    except Exception as e:
-        frappe.log_error(f"Error setting agent_group in new() API: {str(e)}", "Ticket Creation Error")
+    except:
+        # If import fails, fallback already set agent_group above
+        pass
     
     d.insert()
-    frappe.log_error(f"[TICKET API DEBUG] Ticket {d.name} inserted, agent_group: {d.agent_group}", "Ticket Creation Debug")
     return d
+
+
+def _set_agent_group_fallback(doc):
+    """Fallback method to set agent_group - works without pw_helpdesk imports"""
+    if doc.agent_group or not doc.custom_category:
+        return
+    
+    try:
+        # Try to get agent_group from category's SLA
+        sla_agreements = frappe.db.sql("""
+            SELECT DISTINCT parent, custom_auto_assign_team
+            FROM `tabHD Category MultiSelect` cms
+            JOIN `tabHD Service Level Agreement` sla ON cms.parent = sla.name
+            WHERE cms.category = %s AND sla.enabled = 1
+            ORDER BY sla.creation ASC
+            LIMIT 1
+        """, (doc.custom_category,), as_dict=True)
+        
+        if sla_agreements and sla_agreements[0].get("custom_auto_assign_team"):
+            doc.agent_group = sla_agreements[0]["custom_auto_assign_team"]
+            return
+        
+        # Try to get agent_group from SLA if doc has sla set
+        if doc.sla:
+            sla_team = frappe.db.get_value("HD Service Level Agreement", doc.sla, "custom_auto_assign_team")
+            if sla_team:
+                doc.agent_group = sla_team
+                return
+        
+        # Fallback: Get first available active team
+        teams = frappe.get_all("HD Team", filters={"is_active": 1}, limit=1, pluck="name")
+        if teams:
+            doc.agent_group = teams[0]
+    except Exception:
+        # Silently fail - assignment hooks will handle it
+        pass
 
 
 @frappe.whitelist()
