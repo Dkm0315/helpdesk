@@ -5,10 +5,12 @@ from frappe.automation.doctype.assignment_rule.assignment_rule import Assignment
 def _safe_debug_log(msg):
     """
     Safely log debug messages without causing BrokenPipeError.
-    Only logs if developer mode is enabled to avoid production noise.
+    Logs in developer mode or dev sites to help with debugging.
     """
     try:
-        if frappe.conf.developer_mode:
+        # Log in developer mode or if site is a dev site
+        is_dev = frappe.conf.developer_mode or frappe.conf.get("dev_site", False)
+        if is_dev:
             frappe.log_error(msg, "Assignment Rule Debug")
     except (BrokenPipeError, OSError, IOError):
         # Silently ignore broken pipe and IO errors

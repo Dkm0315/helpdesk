@@ -43,7 +43,14 @@ const raisedFor = computed({
   get: () => {
     if (props.ticket.custom_for_others) return "Others";
     if (props.ticket.custom_for_myself) return "Myself";
-    return props.ticket.custom_raised_for || "Myself";
+    // Check both field name variations (backend has typo: custom_rasied_for)
+    const value = props.ticket.custom_rasied_for || props.ticket.custom_raised_for || "Myself";
+    // Safety check: never return "Other"
+    if (value === "Other") {
+      console.warn("[TICKET DEBUG] Warning: 'Other' detected in raisedFor getter, returning 'Others'");
+      return "Others";
+    }
+    return value;
   },
   set: (val) => {
     // This will be handled by handleRaisedForChange
@@ -79,8 +86,16 @@ async function ensureEmployeeNameDisplay(employeeId: string) {
 }
 
 function handleRaisedForChange(value: string) {
+  console.log("[TICKET DEBUG] handleRaisedForChange called, value:", value);
+  
+  // Safety check: ensure value is never "Other"
+  if (value === "Other") {
+    console.warn("[TICKET DEBUG] Warning: 'Other' detected in handleRaisedForChange, converting to 'Others'");
+    value = "Others";
+  }
+  
   const updates: any = {
-    custom_raised_for: value,
+    custom_rasied_for: value, // Use correct field name with typo to match backend
     custom_for_myself: value === "Myself" ? 1 : 0,
     custom_for_others: value === "Others" ? 1 : 0,
   };
@@ -89,7 +104,8 @@ function handleRaisedForChange(value: string) {
     updates.custom_raise_for_employee = "";
   }
   
-  emit("update", { field: "custom_raised_for", value });
+  console.log("[TICKET DEBUG] Emitting updates:", updates);
+  emit("update", { field: "custom_rasied_for", value }); // Use correct field name
   emit("update", { field: "custom_for_myself", value: updates.custom_for_myself });
   emit("update", { field: "custom_for_others", value: updates.custom_for_others });
   
@@ -99,7 +115,9 @@ function handleRaisedForChange(value: string) {
 }
 
 async function handleEmployeeChange(value: string) {
+  console.log("[TICKET DEBUG] handleEmployeeChange called, value:", value);
   emit("update", { field: "custom_raise_for_employee", value });
+  console.log("[TICKET DEBUG] Emitted update for custom_raise_for_employee:", value);
   if (value) {
     await ensureEmployeeNameDisplay(value);
   }

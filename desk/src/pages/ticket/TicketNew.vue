@@ -19,21 +19,6 @@
       <div v-if="Boolean(template.data?.about)" class="">
         <div class="prose-f" v-html="sanitize(template.data.about)" />
       </div>
-      <!-- custom fields -->
-      <div
-        class="grid grid-cols-1 gap-4 sm:grid-cols-3"
-        v-if="Boolean(visibleFields)"
-      >
-        <UniInput
-          v-for="field in visibleFields"
-          :key="field.fieldname"
-          :field="field"
-          :value="templateFields[field.fieldname]"
-          @change="
-            (e) => handleOnFieldChange(e, field.fieldname, field.fieldtype)
-          "
-        />
-      </div>
       <!-- Raise For Others fields -->
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="flex flex-col gap-2">
@@ -41,14 +26,14 @@
             Raised For
           </span>
           <FormControl
-            v-model="custom_raised_for"
+            v-model="custom_rasied_for"
             type="select"
             :options="raisedForOptions"
             placeholder="Select an option"
             @change="onRaisedForChange"
           />
         </div>
-        <div v-if="custom_raised_for === 'Others'" class="flex flex-col gap-2">
+        <div v-if="custom_rasied_for === 'Others'" class="flex flex-col gap-2">
           <span class="block text-sm text-gray-700">
             Employee
           </span>
@@ -164,18 +149,12 @@
 </template>
 
 <script setup lang="ts">
-import { LayoutHeader, UniInput } from "@/components";
+import { LayoutHeader } from "@/components";
 import EmployeeLink from "../../components/ticket/EmployeeLink.vue";
-import {
-  handleLinkFieldUpdate,
-  handleSelectFieldUpdate,
-  parseField,
-  setupCustomizations,
-} from "@/composables/formCustomisation";
 import { useAuthStore } from "@/stores/auth";
 import { globalStore } from "@/stores/globalStore";
 import { capture } from "@/telemetry";
-import { Field } from "@/types";
+// Field type removed - templateFields no longer used
 import { isCustomerPortal, uploadFunction } from "@/utils";
 import {
   Breadcrumbs,
@@ -188,7 +167,7 @@ import {
 import { useOnboarding } from "frappe-ui/frappe";
 import { isEmpty } from "lodash";
 import sanitizeHtml from "sanitize-html";
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import SearchArticles from "../../components/SearchArticles.vue";
 import TicketTextEditor from "./TicketTextEditor.vue";
@@ -210,13 +189,13 @@ const { isManager, userId: userID } = useAuthStore();
 const subject = ref("");
 const description = ref("");
 const attachments = ref([]);
-const templateFields = reactive({});
+// templateFields removed - no longer needed
 const custom_category = ref("");
 const custom_subcategory = ref("");
 const categoriesOptions = ref([]);
 const subcategoriesOptions = ref([]);
 // Raise For Others fields
-const custom_raised_for = ref("Myself");
+const custom_rasied_for = ref("Myself");
 const custom_raise_for_employee = ref("");
 const raisedForOptions = [
   { label: "Myself", value: "Myself" },
@@ -231,45 +210,11 @@ const template = createResource({
   auto: true,
   onSuccess: (data) => {
     description.value = data.description_template || "";
-    oldFields = window.structuredClone(data.fields || []);
-    setupCustomizations(template, {
-      doc: templateFields,
-      call,
-      router,
-      $dialog,
-      applyFilters,
-    });
-    setupTemplateFields(data.fields);
+    // TemplateFields removed - no longer needed
   },
 });
 
-function setupTemplateFields(fields) {
-  fields.forEach((field: Field) => {
-    templateFields[field.fieldname] = "";
-  });
-}
-
-let oldFields = [];
-
-function applyFilters(fieldname: string, filters: any = null) {
-  const f: Field = template.data.fields.find((f) => f.fieldname === fieldname);
-  if (!f) return;
-  if (f.fieldtype === "Select") {
-    handleSelectFieldUpdate(f, fieldname, filters, templateFields, oldFields);
-  } else if (f.fieldtype === "Link") {
-    handleLinkFieldUpdate(f, fieldname, filters, templateFields, oldFields);
-  }
-}
-
-const customOnChange = computed(() => template.data?._customOnChange);
-
-const visibleFields = computed(() => {
-  let _fields = template.data?.fields?.filter(
-    (f) => !isCustomerPortal.value || !f.hide_from_customer
-  );
-  if (!_fields) return [];
-  return _fields.map((field) => parseField(field, templateFields));
-});
+// TemplateFields removed - no longer needed
 
 async function ensureEmployeeNameDisplay(employeeId: string) {
   if (!employeeId) return;
@@ -312,46 +257,53 @@ async function ensureEmployeeNameDisplay(employeeId: string) {
   }
 }
 
-function handleOnFieldChange(e: any, fieldname: string, fieldtype: string) {
-  templateFields[fieldname] = e.value;
-  
-  // Handle employee field change to ensure name is displayed
-  if (fieldname === "custom_raise_for_employee" && e.value) {
-    ensureEmployeeNameDisplay(e.value);
-  }
-  
-  const fieldDependentFns = customOnChange.value?.[fieldname];
-  if (fieldDependentFns) {
-    fieldDependentFns.forEach((fn: Function) => {
-      fn(e.value, fieldtype);
-    });
-  }
-}
+// handleOnFieldChange removed - templateFields no longer used
 
 const ticket = createResource({
   url: "helpdesk.helpdesk.doctype.hd_ticket.api.new",
   debounce: 300,
-  makeParams: () => ({
-    doc: {
+  makeParams: () => {
+    // Ensure value is never "Other" - always use "Others"
+    let raisedForValue = custom_rasied_for.value;
+    if (raisedForValue === "Other") {
+      console.warn("[TICKET DEBUG] Warning: 'Other' detected, converting to 'Others'");
+      raisedForValue = "Others";
+      custom_rasied_for.value = "Others";
+    }
+    
+    // Build doc payload - do not include templateFields
+    const docPayload = {
       description: description.value,
       subject: subject.value,
       template: props.templateId,
       custom_category: custom_category.value,
       custom_subcategory: custom_subcategory.value,
-      custom_raised_for: custom_raised_for.value,
+      custom_rasied_for: raisedForValue,
       custom_raise_for_employee: custom_raise_for_employee.value,
-      custom_for_myself: custom_raised_for.value === "Myself" ? 1 : 0,
-      custom_for_others: custom_raised_for.value === "Others" ? 1 : 0,
-      ...templateFields,
-    },
-    attachments: attachments.value,
-  }),
+      custom_for_myself: raisedForValue === "Myself" ? 1 : 0,
+      custom_for_others: raisedForValue === "Others" ? 1 : 0,
+    };
+    
+    // Debug logs
+    console.log("=== TICKET CREATION DEBUG ===");
+    console.log("custom_rasied_for value:", raisedForValue);
+    console.log("custom_raise_for_employee value:", custom_raise_for_employee.value);
+    console.log("custom_for_myself:", docPayload.custom_for_myself);
+    console.log("custom_for_others:", docPayload.custom_for_others);
+    console.log("Full doc payload:", JSON.stringify(docPayload, null, 2));
+    console.log("============================");
+    
+    return {
+      doc: docPayload,
+      attachments: attachments.value,
+    };
+  },
   validate: (params) => {
-    const fields = visibleFields.value?.filter((f) => f.required) || [];
-    const toVerify = [...fields, "subject", "description", "custom_category"];
+    // Basic validation - templateFields removed
+    const toVerify = ["subject", "description", "custom_category"];
     for (const field of toVerify) {
-      if (isEmpty(params.doc[field.fieldname || field])) {
-        return `${field.label || field} is required`;
+      if (isEmpty(params.doc[field])) {
+        return `${field} is required`;
       }
     }
   },
@@ -375,7 +327,6 @@ const ticket = createResource({
           ticketID: data.name,
           subject: subject.value,
           description: description.value,
-          customFields: templateFields,
         },
       });
     }
@@ -423,13 +374,21 @@ async function loadCategories() {
 }
 
 function onRaisedForChange() {
-  if (custom_raised_for.value === "Myself") {
+  console.log("[TICKET DEBUG] onRaisedForChange called, value:", custom_rasied_for.value);
+  if (custom_rasied_for.value === "Myself") {
     custom_raise_for_employee.value = "";
+    console.log("[TICKET DEBUG] Cleared custom_raise_for_employee (Myself selected)");
+  } else if (custom_rasied_for.value === "Other") {
+    // Safety check: convert "Other" to "Others"
+    console.warn("[TICKET DEBUG] Warning: 'Other' detected in onRaisedForChange, converting to 'Others'");
+    custom_rasied_for.value = "Others";
   }
 }
 
 async function onEmployeeChange(employeeId: string) {
+  console.log("[TICKET DEBUG] onEmployeeChange called, employeeId:", employeeId);
   custom_raise_for_employee.value = employeeId;
+  console.log("[TICKET DEBUG] custom_raise_for_employee.value set to:", custom_raise_for_employee.value);
   if (employeeId) {
     await ensureEmployeeNameDisplay(employeeId);
   }
