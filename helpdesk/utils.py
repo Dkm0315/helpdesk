@@ -1,5 +1,6 @@
 import functools
 import re
+from datetime import date, datetime
 from typing import List
 
 import frappe
@@ -137,6 +138,21 @@ def alphanumeric_to_int(s: str) -> int | None:
     return int(s.group(0))
 
 
+def _normalize_dates(obj):
+    """
+    Recursively normalize date/datetime objects to strings in a dict/list structure.
+    This ensures consistent types for safe_eval comparisons.
+    """
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: _normalize_dates(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_normalize_dates(item) for item in obj]
+    else:
+        return obj
+
+
 def get_context(d: Document) -> dict:
     """
     Get safe context for `safe_eval`
@@ -167,9 +183,18 @@ def get_context(d: Document) -> dict:
         except:
             pass
     
+    # Get document as dict and normalize date/datetime fields to strings
+    # This prevents TypeError when comparing dates in SLA conditions
+    doc_dict = d.as_dict()
+    doc_dict = _normalize_dates(doc_dict)
+    
+    # Normalize employee data dates as well
+    if employee:
+        employee = _normalize_dates(employee)
+    
     # Build context with employee data
     context = {
-        "doc": d.as_dict(),
+        "doc": doc_dict,
         "frappe": frappe._dict(utils=utils),
         "employee": employee
     }
