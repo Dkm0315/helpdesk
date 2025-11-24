@@ -18,7 +18,19 @@ def new(doc, attachments=[]):
     doc["doctype"] = "HD Ticket"
     doc["via_customer_portal"] = bool(frappe.session.user)
     doc["attachments"] = attachments
-    d = frappe.get_doc(doc).insert()
+    d = frappe.get_doc(doc)
+    
+    # Ensure agent_group is set from category before insert
+    # This ensures assignment hooks have agent_group available
+    try:
+        from pw_helpdesk.customizations.ticket_events import ensure_agent_group_from_category
+        ensure_agent_group_from_category(d)
+        frappe.log_error(f"[TICKET API DEBUG] After ensure_agent_group_from_category, agent_group: {d.agent_group}, category: {d.custom_category}", "Ticket Creation Debug")
+    except Exception as e:
+        frappe.log_error(f"Error setting agent_group in new() API: {str(e)}", "Ticket Creation Error")
+    
+    d.insert()
+    frappe.log_error(f"[TICKET API DEBUG] Ticket {d.name} inserted, agent_group: {d.agent_group}", "Ticket Creation Debug")
     return d
 
 
