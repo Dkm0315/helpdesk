@@ -429,29 +429,8 @@ def do_assignment_filtered(self, doc):
     
     _safe_debug_log(f"[ASSIGNMENT DEBUG] do_assignment_filtered - Rule: {self.name}, DocType: {doctype}, Name: {name_str}")
     
-    # Check for existing assignments BEFORE clearing
-    existing_assignments = frappe.get_all("ToDo", filters={
-        "reference_type": doctype,
-        "reference_name": name_str,
-        "status": "Open",
-    }, fields=["name", "allocated_to", "assignment_rule"])
-    
-    _safe_debug_log(f"[ASSIGNMENT DEBUG] Existing assignments before clearing: {len(existing_assignments)}")
-    for existing in existing_assignments:
-        _safe_debug_log(f"[ASSIGNMENT DEBUG]   - ToDo {existing.name}: {existing.allocated_to} (Rule: {existing.assignment_rule})")
-    
-    # If ticket already has an assignment from a different rule, skip to prevent duplicate assignments
-    # Only clear and reassign if assignment is from the same rule (to update) or if no assignment exists
-    if existing_assignments:
-        # Check if any existing assignment is from a different rule
-        different_rule_assignments = [a for a in existing_assignments if a.assignment_rule and a.assignment_rule != self.name]
-        if different_rule_assignments:
-            _safe_debug_log(f"[ASSIGNMENT DEBUG] Skipping assignment - ticket already assigned via different rule(s): {[a.assignment_rule for a in different_rule_assignments]}")
-            return False
-    
     # Clear existing assignment (doc.get() works on Document objects)
     assign_to.clear(doctype, name_str, ignore_permissions=True)
-    _safe_debug_log(f"[ASSIGNMENT DEBUG] Cleared existing assignments")
     
     # Get user (this will use our filtered method which handles dict conversion)
     user = self.get_user(doc)
@@ -524,15 +503,33 @@ def do_assignment_filtered(self, doc):
         todo_doc.insert(ignore_permissions=True, ignore_links=True)
         _safe_debug_log(f"[ASSIGNMENT DEBUG] Created ToDo {todo_doc.name} for user {user}")
         
-        # Update assigned_to field if it exists and document exists
+        # Update _assign field on the document so frontend can display assignees
         try:
             # Check if document exists before trying to update
             if frappe.db.exists(doctype, name_str):
+                # Get current _assign value or create new list
+                doc = frappe.get_doc(doctype, name_str)
+                current_assign = []
+                if hasattr(doc, '_assign') and doc._assign:
+                    try:
+                        current_assign = frappe.parse_json(doc._assign) or []
+                    except:
+                        current_assign = []
+                
+                # Add new assignee if not already in list
+                if user not in current_assign:
+                    current_assign.append(user)
+                
+                # Update _assign field
+                frappe.db.set_value(doctype, name_str, "_assign", frappe.as_json(current_assign), update_modified=False)
+                _safe_debug_log(f"[ASSIGNMENT DEBUG] Updated _assign field for {doctype} {name_str} to {frappe.as_json(current_assign)}")
+                
+                # Also update assigned_to field if it exists
                 if frappe.get_meta(doctype).get_field("assigned_to"):
                     frappe.db.set_value(doctype, name_str, "assigned_to", user)
                     _safe_debug_log(f"[ASSIGNMENT DEBUG] Updated assigned_to field to {user}")
         except Exception as e:
-            _safe_debug_log(f"[ASSIGNMENT DEBUG] Could not update assigned_to field: {str(e)}")
+            _safe_debug_log(f"[ASSIGNMENT DEBUG] Could not update _assign/assigned_to field: {str(e)}")
         
         # set for reference in round robin
         self.db_set("last_user", user)
