@@ -138,17 +138,21 @@ def alphanumeric_to_int(s: str) -> int | None:
     return int(s.group(0))
 
 
-def _normalize_dates(obj):
+def _normalize_dates(obj, convert_to_dict=False):
     """
     Recursively normalize date/datetime objects to strings in a dict/list structure.
     This ensures consistent types for safe_eval comparisons.
+    
+    :param obj: Object to normalize (dict, list, date, datetime, or other)
+    :param convert_to_dict: If True, convert dicts to frappe._dict for dot notation access
     """
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()
     elif isinstance(obj, dict):
-        return {k: _normalize_dates(v) for k, v in obj.items()}
+        normalized = {k: _normalize_dates(v, convert_to_dict) for k, v in obj.items()}
+        return frappe._dict(normalized) if convert_to_dict else normalized
     elif isinstance(obj, list):
-        return [_normalize_dates(item) for item in obj]
+        return [_normalize_dates(item, convert_to_dict) for item in obj]
     else:
         return obj
 
@@ -185,12 +189,13 @@ def get_context(d: Document) -> dict:
     
     # Get document as dict and normalize date/datetime fields to strings
     # This prevents TypeError when comparing dates in SLA conditions
+    # Convert to frappe._dict to support dot notation access (e.g., doc.custom_category)
     doc_dict = d.as_dict()
-    doc_dict = _normalize_dates(doc_dict)
+    doc_dict = _normalize_dates(doc_dict, convert_to_dict=True)
     
     # Normalize employee data dates as well
     if employee:
-        employee = _normalize_dates(employee)
+        employee = _normalize_dates(employee, convert_to_dict=True)
     
     # Build context with employee data
     context = {
