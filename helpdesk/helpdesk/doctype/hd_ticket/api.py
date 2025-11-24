@@ -18,17 +18,6 @@ def new(doc, attachments=[]):
     doc["doctype"] = "HD Ticket"
     doc["via_customer_portal"] = bool(frappe.session.user)
     doc["attachments"] = attachments
-    
-    # Normalize "Raised For" field value before validation
-    # The field accepts "Myself" and "Others" (plural), but frontend might send "Other" (singular)
-    raised_for_field = doc.get("custom_rasied_for") or doc.get("custom_raised_for")
-    if raised_for_field == "Other":
-        # Update the actual field name (custom_rasied_for has typo but is the real field name)
-        if "custom_rasied_for" in doc:
-            doc["custom_rasied_for"] = "Others"
-        elif "custom_raised_for" in doc:
-            doc["custom_raised_for"] = "Others"
-    
     d = frappe.get_doc(doc).insert()
     return d
 
