@@ -83,6 +83,7 @@
           v-model="filters.category"
           :page-length="5"
           :hide-me="true"
+          :displayField="'category_name'"
         >
           <template #prefix>
             <LucideFolder class="size-4 text-ink-gray-5 mr-2" />

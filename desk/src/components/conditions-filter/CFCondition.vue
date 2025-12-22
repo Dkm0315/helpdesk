@@ -275,11 +275,16 @@ function getValueControl() {
     if (fieldtype == "Dynamic Link") {
       return h(FormControl, { type: "text" });
     }
-    return h(Link, {
+    const linkProps = {
       class: "form-control",
       doctype: options,
       value: props.condition[2],
-    });
+    };
+    // Add display field for HD Category to show category_name instead of ID
+    if (options === "HD Category") {
+      linkProps.displayField = "category_name";
+    }
+    return h(Link, linkProps);
   } else if (typeNumber.includes(fieldtype)) {
     return h(FormControl, { type: "number" });
   } else if (typeDate.includes(fieldtype) && operator == "between") {

@@ -110,6 +110,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  displayField: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(["update:modelValue", "change"]);
@@ -151,13 +155,18 @@ watchDebounced(
 watch(
   () => props?.filters,
   (newVal) => {
+    const newParams = props.doctype === "HD Category" ? {
+      txt: text.value,
+      limit: props.pageLength,
+    } : {
+      txt: text.value,
+      doctype: props.doctype,
+      filters: newVal,
+      page_length: props.pageLength,
+    };
+
     options.update({
-      params: {
-        txt: text.value,
-        doctype: props.doctype,
-        filters: newVal,
-        page_length: props.pageLength,
-      },
+      params: newParams,
     });
     options.reload();
   },
@@ -165,23 +174,38 @@ watch(
 );
 
 const options = createResource({
-  url: "frappe.desk.search.search_link",
-  cache: [props.doctype, text.value, props.hideMe],
+  url: props.doctype === "HD Category" ? "helpdesk.api.category.search_categories" : "frappe.desk.search.search_link",
+  cache: [props.doctype, text.value, props.hideMe, props.displayField],
   method: "POST",
-  params: {
+  params: props.doctype === "HD Category" ? {
+    txt: text.value,
+    limit: props.pageLength,
+  } : {
     txt: text.value,
     doctype: props.doctype,
     filters: props.filters,
     page_length: props.pageLength,
+    reference_doctype: props.displayField ? props.doctype : undefined,
+    ignore_user_permissions: true,
   },
   transform: (data) => {
-    let allData = data.map((option) => {
-      return {
+    let allData;
+
+    // HD Category uses custom API that already returns correct format
+    if (props.doctype === "HD Category") {
+      allData = data.map((option) => ({
+        value: option.value,
+        label: option.label,
+        description: option.description,
+      }));
+    } else {
+      // Standard frappe search_link format
+      allData = data.map((option) => ({
         value: option.value,
         label: option?.label || option.value,
         description: option?.description,
-      };
-    });
+      }));
+    }
 
     if (
       !props.hideMe &&
@@ -200,17 +224,22 @@ function reload(val) {
   if (
     options.data?.length &&
     val === options.params?.txt &&
-    props.doctype === options.params?.doctype
+    (props.doctype === "HD Category" || props.doctype === options.params?.doctype)
   )
     return;
 
+  const newParams = props.doctype === "HD Category" ? {
+    txt: val,
+    limit: props.pageLength,
+  } : {
+    txt: val,
+    doctype: props.doctype,
+    filters: props.filters,
+    page_length: props.pageLength,
+  };
+
   options.update({
-    params: {
-      txt: val,
-      doctype: props.doctype,
-      filters: props.filters,
-      page_length: props.pageLength,
-    },
+    params: newParams,
   });
   options.reload();
 }

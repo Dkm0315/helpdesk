@@ -340,6 +340,12 @@ def get_filterable_fields(doctype: str, show_customer_portal_fields=False):
     for field in standard_fields:
         if field.get("fieldname") not in [r.get("fieldname") for r in res]:
             res.append(field)
+
+    # Add display field information for HD Category links
+    for field in res:
+        if field.get("fieldtype") == "Link" and field.get("options") == "HD Category":
+            field["display_field"] = "category_name"
+
     return res
 
 
