@@ -28,6 +28,9 @@ scheduler_events = {
         "helpdesk.search.build_index_if_not_exists",
         "helpdesk.search.download_corpus",
     ],
+    "hourly": [
+        "helpdesk.helpdesk.doctype.hd_ticket.hd_ticket.check_second_level_escalation"
+    ],
     "daily": [
         "helpdesk.helpdesk.doctype.hd_ticket.hd_ticket.close_tickets_after_n_days"
     ],
