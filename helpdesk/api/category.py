@@ -10,10 +10,11 @@ def get_categories():
         categories = frappe.get_all(
             "HD Category",
             filters={"is_active": 1, "is_sub_category": 0},
-            fields=["name", "category_name", "category_code", "description"],
+            fields=["name", "category_name", "category_code", "description",
+                    "make_attachment_mandatory", "same_attachment_setting_as_category", "hide_attachment_field"],
             order_by="category_name asc"
         )
-        
+
         # Get subcategories for each category
         for category in categories:
             subcategories = frappe.get_all(
@@ -23,11 +24,12 @@ def get_categories():
                     "is_sub_category": 1,
                     "parent_category": category["name"]
                 },
-                fields=["name", "category_name", "category_code", "description"],
+                fields=["name", "category_name", "category_code", "description",
+                        "make_attachment_mandatory", "same_attachment_setting_as_category", "hide_attachment_field"],
                 order_by="category_name asc"
             )
             category["subcategories"] = subcategories
-        
+
         return categories
     except Exception as e:
         frappe.log_error(f"Error fetching categories: {str(e)}")
@@ -40,7 +42,7 @@ def get_subcategories(parent_category):
     try:
         if not parent_category:
             return []
-        
+
         subcategories = frappe.get_all(
             "HD Category",
             filters={
@@ -48,10 +50,11 @@ def get_subcategories(parent_category):
                 "is_sub_category": 1,
                 "parent_category": parent_category
             },
-            fields=["name", "category_name", "category_code", "description"],
+            fields=["name", "category_name", "category_code", "description",
+                    "make_attachment_mandatory", "same_attachment_setting_as_category", "hide_attachment_field"],
             order_by="category_name asc"
         )
-        
+
         return subcategories
     except Exception as e:
         frappe.log_error(f"Error fetching subcategories: {str(e)}")

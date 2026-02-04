@@ -973,18 +973,20 @@ class HDTicket(Document):
     # Since this is called from communication itself, `c` is the communication doc.
     def on_communication_update(self, c):
         # If communication is incoming, then it is a reply from customer, and ticket must
-        # be reopened.
+        # be reopened - but only if NOT a self-reply (raiser replying to their own ticket)
         if c.sent_or_received == "Received":
-            self.status = "Open"
+            # Only reopen if sender is different from ticket raiser OR if status was Replied
+            if c.sender != self.raised_by or self.status == "Replied":
+                self.status = "Open"
         # If communication is outgoing, it must be a reply from agent
         if c.sent_or_received == "Sent":
-            # Set first response date if not set already
-            self.first_responded_on = (
-                self.first_responded_on or frappe.utils.now_datetime()
-            )
-
-            if frappe.db.get_single_value("HD Settings", "auto_update_status"):
-                self.status = "Replied"
+            # Only count as agent response if sender is NOT the ticket raiser
+            if c.sender != self.raised_by:
+                self.first_responded_on = (
+                    self.first_responded_on or frappe.utils.now_datetime()
+                )
+                if frappe.db.get_single_value("HD Settings", "auto_update_status"):
+                    self.status = "Replied"
 
         # Fetch description from communication if not set already. This might not be needed
         # anymore as a communication is created when a ticket is created.
