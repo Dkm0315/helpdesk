@@ -109,6 +109,9 @@ class HDTeam(Document):
         # If agent removed, remove from the support rule of the team
         # If agent added add to the support rule of the team and also, while adding remove from base Support Rotation
         """
+        if not self.assignment_rule:
+            return
+
         assg_rule_doc = frappe.get_doc("Assignment Rule", self.assignment_rule)
         if not assg_rule_doc:
             return

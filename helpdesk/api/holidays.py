@@ -192,7 +192,7 @@ def should_exclude_user_from_assignment(user, assignment_rule_name=None, check_d
         from frappe.utils import getdate, today
         
         if not check_date:
-            check_date = today()
+            check_date = getdate(today())
         else:
             check_date = getdate(check_date)
         

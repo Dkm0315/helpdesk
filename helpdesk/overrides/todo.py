@@ -12,26 +12,27 @@ def after_insert(doc, method=None):
     if not doc.reference_name:
         return
 
-    # Check if this TODO is for ticket assignment by looking at the description
-    # The default assignment creates TODOs with descriptions like "Automatic Assignment" or similar
-    # We want to update it to be more specific for helpdesk tickets
+    # Build a rich description from the ticket's subject + description
     try:
-        # Use the subject as the description
-        if doc.subject:
-            new_description = doc.subject
+        ticket_data = frappe.db.get_value(
+            "HD Ticket", doc.reference_name, ["subject", "description"], as_dict=True
+        )
+        if ticket_data:
+            subj = ticket_data.get("subject") or ""
+            desc = (ticket_data.get("description") or "")[:200]
+            new_description = f"Subject: {subj} | Description: {desc}"
         else:
-            # Fallback if no subject exists
-            ticket_number = doc.reference_name
-            new_description = f"Ticket {ticket_number} has been assigned to you"
+            new_description = f"Ticket {doc.reference_name} has been assigned to you"
 
         # Only update if the current description is generic/default
-        # This prevents overwriting user-customized descriptions
         if doc.description and any(keyword in doc.description.lower() for keyword in ["automatic", "assignment", "assigned"]):
-            # Update the description to match the subject
             frappe.db.set_value("ToDo", doc.name, "description", new_description, update_modified=False)
         elif not doc.description:
-            # If no description exists, set it to match the subject
             frappe.db.set_value("ToDo", doc.name, "description", new_description, update_modified=False)
+
+        # Ensure type is set
+        if not doc.type:
+            frappe.db.set_value("ToDo", doc.name, "type", "Help Desk", update_modified=False)
 
     except Exception as e:
         frappe.log_error(f"Error updating TODO description for ticket assignment: {str(e)}")
