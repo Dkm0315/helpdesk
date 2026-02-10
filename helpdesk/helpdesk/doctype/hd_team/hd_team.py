@@ -146,6 +146,8 @@ class HDTeam(Document):
             base_assignment_rule = frappe.get_value(
                 "HD Settings", "HD Settings", "base_support_rotation"
             )
+            if not base_assignment_rule:
+                return
             base_assignment_rule = frappe.get_doc(
                 "Assignment Rule", base_assignment_rule
             )
