@@ -405,10 +405,10 @@ def reject_resolution(ticket_id: str, rejection_reason: str = ""):
         }).insert(ignore_permissions=True)
 
     # Reset ticket for new resolution - back to Replied status for new resolution
+    # Keep resolution_details for audit trail (already archived in HD Resolution History)
     ticket_doc.status = "Replied"
     ticket_doc.resolution_submitted = 0
     ticket_doc.resolution_submitted_on = None
-    ticket_doc.resolution_details = ""
 
     # Restart SLA if applicable
     _reset_sla_for_rejected_resolution(ticket_doc)

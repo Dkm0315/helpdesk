@@ -44,6 +44,103 @@ def get_resolution_history(ticket_id: str) -> List[Dict[str, Any]]:
 
 
 @frappe.whitelist()
+def save_resolution_with_history(ticket_id: str, resolution_content: str) -> Dict[str, Any]:
+    """
+    Save resolution with history tracking. This is the single entry point for all
+    resolution updates to ensure history is never lost.
+
+    1. If ticket already has resolution_details that differ from new content,
+       archives the OLD resolution to HD Resolution History
+    2. Updates resolution_details with new content
+    3. Creates a NEW HD Resolution History entry marked as current
+    4. Updates current_resolution_version on the ticket
+    """
+    ticket_doc = frappe.get_doc("HD Ticket", ticket_id)
+
+    if not resolution_content or not resolution_content.strip():
+        frappe.throw(_("Resolution content cannot be empty"), frappe.ValidationError)
+
+    old_resolution = ticket_doc.resolution_details
+    old_resolution_exists = old_resolution and old_resolution.strip() and old_resolution.strip() != '<p></p>'
+
+    # Get the current max version number for this ticket
+    max_version = frappe.db.get_value(
+        "HD Resolution History",
+        {"ticket": ticket_id},
+        "MAX(version_number)"
+    ) or 0
+
+    # If old resolution exists and differs from new, archive the old one
+    if old_resolution_exists and old_resolution.strip() != resolution_content.strip():
+        # Check if old resolution already has a current history entry
+        existing_current = frappe.db.get_value(
+            "HD Resolution History",
+            {"ticket": ticket_id, "is_current_version": 1},
+            "name"
+        )
+
+        if existing_current:
+            # Mark the existing current version as not current
+            frappe.db.set_value("HD Resolution History", existing_current, "is_current_version", 0)
+        else:
+            # No history entry exists for the old resolution — create one to preserve it
+            max_version += 1
+            frappe.get_doc({
+                "doctype": "HD Resolution History",
+                "ticket": ticket_id,
+                "version_number": max_version,
+                "resolution_content": old_resolution,
+                "submitted_by": ticket_doc.owner,
+                "submitted_on": ticket_doc.resolution_submitted_on or ticket_doc.modified,
+                "satisfaction_status": "Pending",
+                "is_current_version": 0
+            }).insert(ignore_permissions=True)
+    elif not old_resolution_exists:
+        # No old resolution — just unmark any stale current entries
+        frappe.db.sql("""
+            UPDATE `tabHD Resolution History`
+            SET is_current_version = 0
+            WHERE ticket = %s AND is_current_version = 1
+        """, (ticket_id,))
+
+    # Create new resolution history entry as current
+    max_version = frappe.db.get_value(
+        "HD Resolution History",
+        {"ticket": ticket_id},
+        "MAX(version_number)"
+    ) or 0
+    new_version = max_version + 1
+
+    resolution_doc = frappe.get_doc({
+        "doctype": "HD Resolution History",
+        "ticket": ticket_id,
+        "version_number": new_version,
+        "resolution_content": resolution_content,
+        "submitted_by": frappe.session.user,
+        "submitted_on": frappe.utils.now_datetime(),
+        "satisfaction_status": "Pending",
+        "is_current_version": 1
+    })
+    resolution_doc.insert(ignore_permissions=True)
+
+    # Update ticket fields
+    ticket_doc.resolution_details = resolution_content
+    ticket_doc.resolution_submitted = 1
+    ticket_doc.resolution_submitted_on = frappe.utils.now_datetime()
+    ticket_doc.resolution_ever_submitted = 1
+    if hasattr(ticket_doc, 'current_resolution_version'):
+        ticket_doc.current_resolution_version = new_version
+    ticket_doc.save(ignore_permissions=True)
+
+    return {
+        "success": True,
+        "message": "Resolution saved with history",
+        "resolution_id": resolution_doc.name,
+        "version_number": new_version
+    }
+
+
+@frappe.whitelist()
 def create_resolution_history(ticket_id: str, resolution_content: str) -> Dict[str, Any]:
     """
     Create a new resolution history entry when agent submits resolution

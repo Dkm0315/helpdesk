@@ -85,28 +85,20 @@
         <div class="relative">
           <Button
             v-if="canCloseTicket && ticket.data.status !== 'Closed'"
-            :label="hasValidResolution ? 'Close' : 'Close (Resolution Required)'"
-            :variant="hasValidResolution ? 'solid' : 'outline'"
-            :theme="hasValidResolution ? 'red' : 'gray'"
-            :disabled="!hasValidResolution"
-            :class="{ 'opacity-60': !hasValidResolution }"
+            :label="(isAdmin || hasValidResolution) ? 'Close' : 'Close (Resolution Required)'"
+            :variant="(isAdmin || hasValidResolution) ? 'solid' : 'outline'"
+            :theme="(isAdmin || hasValidResolution) ? 'red' : 'gray'"
+            :disabled="isAdmin ? false : !hasValidResolution"
+            :class="{ 'opacity-60': !isAdmin && !hasValidResolution }"
             @click="triggerClose()"
           />
           <Button
             v-else-if="canRequestClosure && ticket.data.status !== 'Closed'"
-            :label="hasValidResolution ? 'Request Closure' : 'Request Closure (Resolution Required)'"
-            :variant="hasValidResolution ? 'solid' : 'outline'"
-            :theme="hasValidResolution ? 'gray' : 'gray'"
-            :disabled="!hasValidResolution"
-            :class="{ 'opacity-60': !hasValidResolution }"
+            label="Request Closure"
+            variant="solid"
+            theme="gray"
             @click="triggerRequestClosure()"
           />
-          <div
-            v-if="(canCloseTicket || canRequestClosure) && ticket.data.status !== 'Closed' && !hasValidResolution"
-            class="absolute -bottom-8 left-0 text-xs text-gray-500 whitespace-nowrap"
-          >
-            Submit resolution first
-          </div>
         </div>
       </template>
     </LayoutHeader>
@@ -766,12 +758,10 @@ async function triggerClose() {
                 try {
                   isLoading.value = true;
 
-                  // Update resolution_details field
-                  await call("frappe.client.set_value", {
-                    doctype: "HD Ticket",
-                    name: props.ticketId,
-                    fieldname: "resolution_details",
-                    value: notes.value,
+                  // Save resolution with history tracking
+                  await call("helpdesk.api.resolution.save_resolution_with_history", {
+                    ticket_id: props.ticketId,
+                    resolution_content: notes.value,
                   });
 
                   // Update status to Closed
@@ -967,6 +957,12 @@ async function triggerRequestClosure() {
 
                 try {
                   isLoading.value = true;
+                  console.log('[triggerRequestClosure] Saving resolution with history');
+                  // Save resolution with history tracking first
+                  await call("helpdesk.api.resolution.save_resolution_with_history", {
+                    ticket_id: props.ticketId,
+                    resolution_content: notes.value,
+                  });
                   console.log('[triggerRequestClosure] Calling request_closure API');
                   const response = await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
                     ticket_id: props.ticketId,

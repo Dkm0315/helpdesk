@@ -34,5 +34,9 @@ def after_insert(doc, method=None):
         if not doc.type:
             frappe.db.set_value("ToDo", doc.name, "type", "Help Desk", update_modified=False)
 
+        # Ensure custom_todo_type is set
+        if not doc.custom_todo_type:
+            frappe.db.set_value("ToDo", doc.name, "custom_todo_type", "Helpdesk", update_modified=False)
+
     except Exception as e:
         frappe.log_error(f"Error updating TODO description for ticket assignment: {str(e)}")

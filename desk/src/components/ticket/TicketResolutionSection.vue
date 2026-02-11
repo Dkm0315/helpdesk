@@ -7,7 +7,7 @@
       </p>
     </div>
 
-    <div v-if="(ticket.status === 'Resolved' || ticket.status === 'Closed') && ticket.resolution_ever_submitted" class="flex-1 p-6">
+    <div v-if="(ticket.status === 'Resolved' || ticket.status === 'Closed') && ticket.resolution_ever_submitted" class="flex-1 overflow-y-auto p-6">
       <div class="bg-green-50 border border-green-200 rounded-lg p-4">
         <div class="flex items-start">
           <TicketIcon class="h-5 w-5 text-green-600 mt-0.5 mr-3" />
@@ -54,6 +54,59 @@
           </div>
         </div>
       </div>
+
+      <!-- Resolution History Timeline -->
+      <div v-if="resolutionHistory.length > 1" class="mt-6">
+        <h4 class="text-sm font-semibold text-gray-700 mb-3">Resolution History</h4>
+        <div class="space-y-3">
+          <div
+            v-for="entry in resolutionHistory"
+            :key="entry.name"
+            class="border rounded-lg p-3"
+            :class="{
+              'border-green-200 bg-green-50': entry.is_current_version,
+              'border-gray-200 bg-gray-50': !entry.is_current_version,
+            }"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium px-2 py-0.5 rounded-full"
+                  :class="{
+                    'bg-green-100 text-green-700': entry.is_current_version,
+                    'bg-gray-200 text-gray-600': !entry.is_current_version,
+                  }"
+                >
+                  v{{ entry.version_number }}
+                </span>
+                <span v-if="entry.is_current_version" class="text-xs text-green-600 font-medium">Current</span>
+                <span
+                  v-if="entry.satisfaction_status && entry.satisfaction_status !== 'Pending'"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full"
+                  :class="{
+                    'bg-green-100 text-green-700': entry.satisfaction_status === 'Satisfied',
+                    'bg-red-100 text-red-700': entry.satisfaction_status === 'Not Satisfied',
+                  }"
+                >
+                  {{ entry.satisfaction_status }}
+                </span>
+              </div>
+              <div class="text-xs text-gray-500">
+                {{ entry.submitted_by_name || entry.submitted_by }} &middot; {{ formatDate(entry.submitted_on) }}
+              </div>
+            </div>
+            <div
+              v-if="!entry.is_current_version"
+              class="text-sm text-gray-600 line-clamp-3 cursor-pointer"
+              :class="{ '!line-clamp-none': expandedHistoryEntries[entry.name] }"
+              @click="expandedHistoryEntries[entry.name] = !expandedHistoryEntries[entry.name]"
+              v-html="entry.resolution_content"
+            />
+            <div v-if="entry.rejection_reason" class="mt-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded p-2">
+              <span class="font-medium">Rejection reason:</span> {{ entry.rejection_reason }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-else class="flex-1 overflow-hidden">
@@ -81,7 +134,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Reject Resolution Dialog -->
     <Dialog v-model="showRejectDialog" :options="{ title: 'Reject Resolution' }">
       <template #body-content>
@@ -121,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, reactive, watch, onMounted } from "vue";
 import { Button, Dialog, FormControl, call, toast } from "frappe-ui";
 import { TextEditor } from "@/components";
 import { TicketIcon } from "@/components/icons";
@@ -158,17 +211,17 @@ const currentUserId = computed(() => userId.value || sessionUser.value);
 // Check if current user can reject resolution
 const canRejectResolution = computed(() => {
   if (!props.ticket || !currentUserId.value) return false;
-  
+
   // Only allow rejection if ticket has resolution
   if (!props.ticket.resolution_details || !props.ticket.resolution_details.trim()) {
     return false;
   }
-  
+
   // User who raised the ticket can reject
   if (currentUserId.value === props.ticket.raised_by) {
     return true;
   }
-  
+
   // Employee for whom ticket was raised can reject
   if (props.ticket.custom_raise_for_employee) {
     // The raised_by field should already be set to employee's user_id
@@ -176,7 +229,7 @@ const canRejectResolution = computed(() => {
       return true;
     }
   }
-  
+
   return false;
 });
 
@@ -200,6 +253,25 @@ const rejectionReason = ref("");
 const isRejecting = ref(false);
 const rejectionError = ref("");
 
+// Resolution history
+const resolutionHistory = ref<any[]>([]);
+const expandedHistoryEntries = reactive<Record<string, boolean>>({});
+
+async function fetchResolutionHistory() {
+  try {
+    const history = await call("helpdesk.api.resolution.get_resolution_history", {
+      ticket_id: props.ticketId,
+    });
+    resolutionHistory.value = history || [];
+  } catch (err) {
+    console.error("Failed to fetch resolution history:", err);
+  }
+}
+
+// Fetch history on mount and when ticket updates
+onMounted(fetchResolutionHistory);
+watch(() => props.ticket?.modified, fetchResolutionHistory);
+
 async function submitResolution() {
   if (!resolutionDetails.value.trim() || resolutionDetails.value.trim() === '<p></p>') {
     toast.error("Resolution details are required");
@@ -209,16 +281,18 @@ async function submitResolution() {
   try {
     isSubmitting.value = true;
 
-    // Update resolution fields - backend will auto-set resolution_submitted_on
+    // Use history-aware API to save resolution
+    await call("helpdesk.api.resolution.save_resolution_with_history", {
+      ticket_id: props.ticketId,
+      resolution_content: resolutionDetails.value,
+    });
+
+    // Set status to Resolved
     await call("frappe.client.set_value", {
       doctype: "HD Ticket",
       name: props.ticketId,
-      fieldname: {
-        "resolution_details": resolutionDetails.value,
-        "resolution_submitted": 1,
-        "resolution_ever_submitted": 1,
-        "status": "Resolved"
-      }
+      fieldname: "status",
+      value: "Resolved",
     });
 
     toast.success("Resolution submitted successfully");

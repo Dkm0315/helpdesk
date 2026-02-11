@@ -478,7 +478,7 @@ def do_assignment_filtered(self, doc):
         date = doc.get(self.due_date_based_on) if isinstance(doc, dict) else (getattr(doc, self.due_date_based_on, None) if self.due_date_based_on else None)
         
         # Create ToDo with ignore_links=True to bypass link validation
-        todo_doc = frappe.get_doc({
+        todo_dict = {
             "doctype": "ToDo",
             "allocated_to": user,
             "reference_type": doctype,
@@ -489,7 +489,14 @@ def do_assignment_filtered(self, doc):
             "date": date or nowdate(),
             "assigned_by": frappe.session.user,
             "assignment_rule": assignment_rule,
-        })
+        }
+
+        # Set Helpdesk-specific fields for HD Ticket assignments
+        if doctype == "HD Ticket":
+            todo_dict["type"] = "Help Desk"
+            todo_dict["custom_todo_type"] = "Helpdesk"
+
+        todo_doc = frappe.get_doc(todo_dict)
         
         # Initialize _assignment attribute to prevent AttributeError in on_update
         todo_doc._assignment = None
