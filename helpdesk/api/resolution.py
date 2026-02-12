@@ -70,6 +70,30 @@ def save_resolution_with_history(ticket_id: str, resolution_content: str) -> Dic
         "MAX(version_number)"
     ) or 0
 
+    # Dedup: if content is identical to existing resolution and current version is still pending, skip
+    if old_resolution_exists and old_resolution.strip() == resolution_content.strip():
+        existing_current = frappe.db.get_value(
+            "HD Resolution History",
+            {"ticket": ticket_id, "is_current_version": 1},
+            ["name", "version_number", "satisfaction_status"],
+            as_dict=True
+        )
+        if existing_current and existing_current.satisfaction_status == "Pending":
+            # Identical content with pending review — no new version needed
+            ticket_doc.resolution_submitted = 1
+            ticket_doc.resolution_submitted_on = frappe.utils.now_datetime()
+            ticket_doc.resolution_ever_submitted = 1
+            if hasattr(ticket_doc, 'current_resolution_version'):
+                ticket_doc.current_resolution_version = existing_current.version_number
+            ticket_doc.flags.ignore_links = True
+            ticket_doc.save(ignore_permissions=True)
+            return {
+                "success": True,
+                "message": "Resolution unchanged",
+                "resolution_id": existing_current.name,
+                "version_number": existing_current.version_number
+            }
+
     # If old resolution exists and differs from new, archive the old one
     if old_resolution_exists and old_resolution.strip() != resolution_content.strip():
         # Check if old resolution already has a current history entry
@@ -111,13 +135,16 @@ def save_resolution_with_history(ticket_id: str, resolution_content: str) -> Dic
     ) or 0
     new_version = max_version + 1
 
+    # Use a single timestamp so the before_save dedup in hd_ticket.py can match
+    submitted_time = frappe.utils.now_datetime()
+
     resolution_doc = frappe.get_doc({
         "doctype": "HD Resolution History",
         "ticket": ticket_id,
         "version_number": new_version,
         "resolution_content": resolution_content,
         "submitted_by": frappe.session.user,
-        "submitted_on": frappe.utils.now_datetime(),
+        "submitted_on": submitted_time,
         "satisfaction_status": "Pending",
         "is_current_version": 1
     })
@@ -126,10 +153,11 @@ def save_resolution_with_history(ticket_id: str, resolution_content: str) -> Dic
     # Update ticket fields
     ticket_doc.resolution_details = resolution_content
     ticket_doc.resolution_submitted = 1
-    ticket_doc.resolution_submitted_on = frappe.utils.now_datetime()
+    ticket_doc.resolution_submitted_on = submitted_time
     ticket_doc.resolution_ever_submitted = 1
     if hasattr(ticket_doc, 'current_resolution_version'):
         ticket_doc.current_resolution_version = new_version
+    ticket_doc.flags.ignore_links = True
     ticket_doc.save(ignore_permissions=True)
 
     return {
@@ -137,6 +165,29 @@ def save_resolution_with_history(ticket_id: str, resolution_content: str) -> Dic
         "message": "Resolution saved with history",
         "resolution_id": resolution_doc.name,
         "version_number": new_version
+    }
+
+
+@frappe.whitelist()
+def close_ticket(ticket_id: str) -> Dict[str, Any]:
+    """
+    Close a ticket by setting its status to Closed.
+    Uses flags.ignore_links to avoid LinkValidationError when
+    linked documents (team, type, etc.) have been deleted.
+    """
+    ticket_doc = frappe.get_doc("HD Ticket", ticket_id)
+
+    from helpdesk.utils import is_admin
+    if not (is_admin() or ticket_doc.raised_by == frappe.session.user):
+        frappe.throw(_("You are not authorized to close this ticket"), frappe.PermissionError)
+
+    ticket_doc.status = "Closed"
+    ticket_doc.flags.ignore_links = True
+    ticket_doc.save(ignore_permissions=True)
+
+    return {
+        "success": True,
+        "message": "Ticket closed successfully",
     }
 
 
@@ -174,6 +225,7 @@ def create_resolution_history(ticket_id: str, resolution_content: str) -> Dict[s
     ticket_doc.resolution_ever_submitted = 1
     ticket_doc.status = "Resolved"
 
+    ticket_doc.flags.ignore_links = True
     ticket_doc.save(ignore_permissions=True)
 
     return {

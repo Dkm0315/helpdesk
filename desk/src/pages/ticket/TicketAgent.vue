@@ -194,6 +194,78 @@
         </div>
       </template>
     </Dialog>
+    <!-- Request Closure Dialog -->
+    <Dialog v-model="showRequestClosureDialog" :options="{ title: 'Request Closure' }">
+      <template #body-content>
+        <div class="flex flex-col flex-1 gap-3">
+          <p class="text-p-base text-ink-gray-7">
+            Request that this ticket be closed by providing resolution details.
+          </p>
+          <div
+            v-if="requestClosureError"
+            class="text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+          >
+            {{ requestClosureError }}
+          </div>
+          <FormControl
+            v-model="requestClosureNotes"
+            type="textarea"
+            placeholder="Describe how this ticket was resolved..."
+            :rows="4"
+          />
+          <div class="flex gap-2 justify-end">
+            <Button
+              variant="subtle"
+              label="Cancel"
+              @click="showRequestClosureDialog = false"
+            />
+            <Button
+              variant="solid"
+              theme="gray"
+              label="Request Closure"
+              :loading="requestClosureLoading"
+              @click="submitRequestClosure"
+            />
+          </div>
+        </div>
+      </template>
+    </Dialog>
+    <!-- Close Ticket Dialog -->
+    <Dialog v-model="showCloseDialog" :options="{ title: 'Close Ticket' }">
+      <template #body-content>
+        <div class="flex flex-col flex-1 gap-3">
+          <p class="text-p-base text-ink-gray-7">
+            Please provide resolution details to close this ticket.
+          </p>
+          <div
+            v-if="closeError"
+            class="text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
+          >
+            {{ closeError }}
+          </div>
+          <FormControl
+            v-model="closeNotes"
+            type="textarea"
+            placeholder="Describe how this ticket was resolved..."
+            :rows="4"
+          />
+          <div class="flex gap-2 justify-end">
+            <Button
+              variant="subtle"
+              label="Cancel"
+              @click="showCloseDialog = false"
+            />
+            <Button
+              variant="solid"
+              theme="red"
+              label="Close Ticket"
+              :loading="closeLoading"
+              @click="submitClose"
+            />
+          </div>
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -267,6 +339,18 @@ const ticketAgentActivitiesRef = ref(null);
 const communicationAreaRef = ref(null);
 const renameSubject = ref("");
 const isLoading = ref(false);
+
+// Request Closure dialog state
+const showRequestClosureDialog = ref(false);
+const requestClosureNotes = ref("");
+const requestClosureLoading = ref(false);
+const requestClosureError = ref("");
+
+// Close Ticket dialog state
+const showCloseDialog = ref(false);
+const closeNotes = ref("");
+const closeLoading = ref(false);
+const closeError = ref("");
 
 const props = defineProps({
   ticketId: {
@@ -677,117 +761,60 @@ function updateOptimistic(fieldname: string, value: string) {
 }
 
 async function triggerClose() {
-  console.log('[triggerClose] Called. Current status:', ticket.data.status);
-  console.log('[triggerClose] Resolution details:', ticket.data.resolution_details);
-
   // Validate that resolution exists before allowing close
   const hasResolution = ticket.data.resolution_details &&
                        ticket.data.resolution_details.trim() &&
                        ticket.data.resolution_details.trim() !== '<p></p>';
 
-  console.log('[triggerClose] hasResolution:', hasResolution);
-
   // Check if resolution details are already filled
   if (hasResolution) {
-    // Resolution details exist, directly close the ticket
-    console.log('[triggerClose] Has resolution, closing directly');
     try {
-      await call("frappe.client.set_value", {
-        doctype: "HD Ticket",
-        name: props.ticketId,
-        fieldname: "status",
-        value: "Closed",
+      await call("helpdesk.api.resolution.close_ticket", {
+        ticket_id: props.ticketId,
       });
-      console.log('[triggerClose] Ticket closed successfully');
       toast.success("Ticket closed successfully");
       ticket.reload();
     } catch (err) {
-      console.error('[triggerClose] Error closing ticket:', err);
       toast.error(err.message || "Failed to close ticket");
     }
     return;
   }
 
-  // No resolution details, show modal to collect them
-  $dialog({
-    title: "Close Ticket",
-    message: "Please provide resolution details to close this ticket.",
-    actions: [],
-    render: ({ close }) => {
-      const notes = ref("");
-      const isLoading = ref(false);
-      const error = ref("");
+  // No resolution details, show template-based dialog to collect them
+  closeNotes.value = "";
+  closeError.value = "";
+  closeLoading.value = false;
+  showCloseDialog.value = true;
+}
 
-      return h("div", { class: "flex flex-col gap-3" }, [
-        error.value && h("div", {
-          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
-        }, error.value),
-        h(FormControl, {
-          type: "textarea",
-          placeholder: "Describe how this ticket was resolved...",
-          rows: 4,
-          modelValue: notes.value,
-          "onUpdate:modelValue": (v: string) => {
-            notes.value = v;
-            error.value = "";
-          },
-        }),
-        h("div", { class: "flex gap-2 justify-end" }, [
-          h(
-            Button,
-            {
-              variant: "subtle",
-              label: "Cancel",
-              onClick: close,
-            },
-            {}
-          ),
-          h(
-            Button,
-            {
-              variant: "solid",
-              theme: "red",
-              label: "Close Ticket",
-              loading: isLoading.value,
-              onClick: async () => {
-                if (!notes.value.trim()) {
-                  error.value = "Resolution details are required";
-                  return;
-                }
+async function submitClose() {
+  if (!closeNotes.value.trim()) {
+    closeError.value = "Resolution details are required";
+    return;
+  }
 
-                try {
-                  isLoading.value = true;
+  try {
+    closeLoading.value = true;
 
-                  // Save resolution with history tracking
-                  await call("helpdesk.api.resolution.save_resolution_with_history", {
-                    ticket_id: props.ticketId,
-                    resolution_content: notes.value,
-                  });
+    // Save resolution with history tracking
+    await call("helpdesk.api.resolution.save_resolution_with_history", {
+      ticket_id: props.ticketId,
+      resolution_content: closeNotes.value,
+    });
 
-                  // Update status to Closed
-                  await call("frappe.client.set_value", {
-                    doctype: "HD Ticket",
-                    name: props.ticketId,
-                    fieldname: "status",
-                    value: "Closed",
-                  });
+    // Close the ticket
+    await call("helpdesk.api.resolution.close_ticket", {
+      ticket_id: props.ticketId,
+    });
 
-                  toast.success("Ticket closed successfully");
-                  ticket.reload();
-                  close();
-                } catch (err) {
-                  error.value = err.message || "Failed to close ticket";
-                } finally {
-                  isLoading.value = false;
-                }
-              },
-            },
-            {}
-          ),
-        ]),
-      ]);
-    },
-  });
+    toast.success("Ticket closed successfully");
+    ticket.reload();
+    showCloseDialog.value = false;
+  } catch (err) {
+    closeError.value = err.message || "Failed to close ticket";
+  } finally {
+    closeLoading.value = false;
+  }
 }
 
 
@@ -878,9 +905,6 @@ async function triggerMarkSatisfied() {
 }
 
 async function triggerRequestClosure() {
-  console.log('[triggerRequestClosure] Called');
-  console.log('[triggerRequestClosure] Resolution details:', ticket.data.resolution_details);
-
   // Check if resolution already exists
   const hasResolution = ticket.data.resolution_details &&
                        ticket.data.resolution_details.trim() &&
@@ -888,107 +912,50 @@ async function triggerRequestClosure() {
 
   // If resolution exists, directly request closure without asking for details again
   if (hasResolution) {
-    console.log('[triggerRequestClosure] Resolution exists, requesting closure directly');
     try {
       const response = await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
         ticket_id: props.ticketId,
         resolution_notes: ticket.data.resolution_details,
       });
-      console.log('[triggerRequestClosure] Response:', response);
-      console.log('[triggerRequestClosure] Email sent:', response?.email_sent);
-      console.log('[triggerRequestClosure] Notification created:', response?.notification_created);
-
       toast.success(response?.message || "Closure request submitted successfully");
       ticket.reload();
     } catch (err) {
-      console.error('[triggerRequestClosure] Error:', err);
       toast.error(err.message || "Failed to submit closure request");
     }
     return;
   }
 
-  // No resolution exists, show modal to collect details
-  console.log('[triggerRequestClosure] No resolution, showing modal');
-  $dialog({
-    title: "Request Closure",
-    message: "Request that this ticket be closed by providing resolution details.",
-    actions: [],
-    render: ({ close }) => {
-      const notes = ref("");
-      const isLoading = ref(false);
-      const error = ref("");
+  // No resolution exists, show template-based dialog to collect details
+  requestClosureNotes.value = "";
+  requestClosureError.value = "";
+  requestClosureLoading.value = false;
+  showRequestClosureDialog.value = true;
+}
 
-      return h("div", { class: "flex flex-col gap-3" }, [
-        error.value && h("div", {
-          class: "text-red-600 text-sm p-2 bg-red-50 border border-red-200 rounded"
-        }, error.value),
-        h(FormControl, {
-          type: "textarea",
-          placeholder: "Describe how this ticket was resolved...",
-          rows: 4,
-          modelValue: notes.value,
-          "onUpdate:modelValue": (v: string) => {
-            notes.value = v;
-            error.value = "";
-          },
-        }),
-        h("div", { class: "flex gap-2 justify-end" }, [
-          h(
-            Button,
-            {
-              variant: "subtle",
-              label: "Cancel",
-              onClick: close,
-            },
-            {}
-          ),
-          h(
-            Button,
-            {
-              variant: "solid",
-              theme: "gray",
-              label: "Request Closure",
-              loading: isLoading.value,
-              onClick: async () => {
-                if (!notes.value.trim()) {
-                  error.value = "Resolution details are required";
-                  return;
-                }
+async function submitRequestClosure() {
+  if (!requestClosureNotes.value.trim()) {
+    requestClosureError.value = "Resolution details are required";
+    return;
+  }
 
-                try {
-                  isLoading.value = true;
-                  console.log('[triggerRequestClosure] Saving resolution with history');
-                  // Save resolution with history tracking first
-                  await call("helpdesk.api.resolution.save_resolution_with_history", {
-                    ticket_id: props.ticketId,
-                    resolution_content: notes.value,
-                  });
-                  console.log('[triggerRequestClosure] Calling request_closure API');
-                  const response = await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
-                    ticket_id: props.ticketId,
-                    resolution_notes: notes.value,
-                  });
-                  console.log('[triggerRequestClosure] Response:', response);
-                  console.log('[triggerRequestClosure] Email sent:', response?.email_sent);
-                  console.log('[triggerRequestClosure] Notification created:', response?.notification_created);
+  try {
+    requestClosureLoading.value = true;
 
-                  toast.success(response?.message || "Closure request submitted successfully");
-                  ticket.reload();
-                  close();
-                } catch (err) {
-                  console.error('[triggerRequestClosure] Error:', err);
-                  error.value = err.message || "Failed to submit closure request";
-                } finally {
-                  isLoading.value = false;
-                }
-              },
-            },
-            {}
-          ),
-        ]),
-      ]);
-    },
-  });
+    // Only call request_closure — it handles save_resolution_with_history internally.
+    // The backend dedup logic prevents duplicates if called again with same content.
+    const response = await call("pw_helpdesk.customizations.ticket_closure_workflow.request_closure", {
+      ticket_id: props.ticketId,
+      resolution_notes: requestClosureNotes.value,
+    });
+
+    toast.success(response?.message || "Closure request submitted successfully");
+    ticket.reload();
+    showRequestClosureDialog.value = false;
+  } catch (err) {
+    requestClosureError.value = err.message || "Failed to submit closure request";
+  } finally {
+    requestClosureLoading.value = false;
+  }
 }
 
 onMounted(() => {

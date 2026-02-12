@@ -98,13 +98,12 @@ class HDTicket(Document):
             if not frappe.db.exists("DocType", "HD Resolution History"):
                 return  # Skip if doctype doesn't exist yet
 
-            # Check if a history entry already exists for this submission
+            # Check if a current history entry already exists (created by save_resolution_with_history)
             existing_entry = frappe.db.exists(
                 "HD Resolution History",
                 {
                     "ticket": self.name,
                     "is_current_version": 1,
-                    "submitted_on": self.resolution_submitted_on
                 }
             )
 
