@@ -222,7 +222,7 @@ onClickOutside(
     }
   },
   {
-    ignore: [".tippy-box", ".tippy-content"],
+    ignore: [".tippy-box", ".tippy-content", ".PopoverContent"],
   }
 );
 
@@ -234,7 +234,7 @@ onClickOutside(
     }
   },
   {
-    ignore: [".tippy-box", ".tippy-content"],
+    ignore: [".tippy-box", ".tippy-content", ".PopoverContent"],
   }
 );
 </script>

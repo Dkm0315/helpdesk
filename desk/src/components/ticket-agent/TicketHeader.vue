@@ -45,6 +45,20 @@
             </Dropdown>
           </div>
         </div>
+        <!-- Reject -->
+        <Button
+          v-if="canReject"
+          label="Reject"
+          theme="red"
+          variant="solid"
+          @click="rejectTicket"
+        />
+        <Button
+          v-if="isRejected"
+          label="View Rejection Reason"
+          variant="outline"
+          @click="viewRejectionReason"
+        />
         <!-- Status -->
         <Dropdown :options="statusDropdown" placement="right">
           <template #default="{ open }">
@@ -133,6 +147,27 @@ const ticket = inject(TicketSymbol);
 const customizations = inject(CustomizationSymbol);
 const activities = inject(ActivitiesSymbol);
 
+const REJECT_REASONS = [
+  "Duplicate Ticket",
+  "Out of Scope",
+  "Insufficient Information",
+  "Invalid Request",
+  "Already Resolved",
+  "Not Supported",
+  "Configuration / How-to (Refer KB)",
+  "Spam / Test Ticket",
+];
+
+const isRejected = computed(
+  () =>
+    Boolean(ticket.value.doc.custom_is_rejected) ||
+    ticket.value.doc.status === "Rejected"
+);
+
+const canReject = computed(
+  () => ticket.value.doc.status !== "Open" && !isRejected.value
+);
+
 const showSubjectDialog = ref(false);
 
 const { notifyTicketUpdate } = useNotifyTicketUpdate(ticket.value?.name);
@@ -196,6 +231,108 @@ const showMergeOption = computed(() => {
     ["Open", "Paused"].includes(ticket.value.doc.status_category)
   );
 });
+function rejectTicket() {
+  const optionsHtml = REJECT_REASONS.map(
+    (r) => `<option value="${r}">${__(r)}</option>`
+  ).join("");
+
+  globalStore().$dialog({
+    title: __("Reject Ticket"),
+    html: `<div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-sm font-medium text-gray-700">${__("Reason")}</label>
+        <select id="reject-reason-select" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none">
+          <option value="" disabled selected>${__("Select a reason")}</option>
+          ${optionsHtml}
+        </select>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-sm font-medium text-gray-700">${__("Description")}</label>
+        <textarea id="reject-reason-description" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none" rows="3" placeholder="${__("Optional description...")}"></textarea>
+      </div>
+    </div>`,
+    actions: [
+      {
+        label: __("Reject"),
+        variant: "solid",
+        theme: "red",
+        onClick: ({ close }: { close: () => void }) => {
+          const selectEl = document.getElementById(
+            "reject-reason-select"
+          ) as HTMLSelectElement;
+          const textareaEl = document.getElementById(
+            "reject-reason-description"
+          ) as HTMLTextAreaElement;
+          const selectedReason = selectEl?.value || "";
+          const description = textareaEl?.value || "";
+
+          if (!selectedReason) {
+            toast.create({
+              title: __("Please select a rejection reason"),
+              icon: "x",
+              iconClasses: "text-red-600",
+            });
+            return;
+          }
+          ticket.value.setValue.submit(
+            {
+              custom_is_rejected: 1,
+              custom_reason: selectedReason,
+              custom_reason_description: description,
+              status: "Rejected",
+            },
+            {
+              onSuccess() {
+                activities.value.reload();
+                toast.create({
+                  title: __("Ticket rejected successfully"),
+                  icon: "check",
+                  iconClasses: "text-green-600",
+                });
+              },
+            }
+          );
+          close();
+        },
+      },
+      {
+        label: __("Cancel"),
+      },
+    ],
+  });
+}
+
+function escapeHtml(str: string) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function viewRejectionReason() {
+  const reason = escapeHtml(
+    ticket.value.doc.custom_reason || __("N/A")
+  );
+  const desc = escapeHtml(
+    ticket.value.doc.custom_reason_description || __("N/A")
+  );
+
+  globalStore().$dialog({
+    title: __("Rejection Reason"),
+    html: `<div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-1">
+        <span class="text-sm font-medium text-gray-700">${__("Reason")}</span>
+        <span class="text-sm text-gray-900">${reason}</span>
+      </div>
+      <div class="flex flex-col gap-1">
+        <span class="text-sm font-medium text-gray-700">${__("Description")}</span>
+        <span class="text-sm text-gray-900">${desc}</span>
+      </div>
+    </div>`,
+  });
+}
+
 const defaultActions = computed(() => {
   let items = [];
 
