@@ -113,6 +113,33 @@ const routes = [
     component: () => import("@/pages/call-logs/CallLogs.vue"),
   },
 
+  // Agent Buy/Our Services Routes
+  {
+    path: "/agent/buy-services",
+    name: "BuyServicesAgent",
+    component: () => import("@/pages/buy-services/BuyServices.vue"),
+  },
+  {
+    path: "/agent/our-services",
+    name: "OurServicesAgent",
+    component: () => import("@/pages/our-services/OurServicesLanding.vue"),
+  },
+  {
+    path: "/agent/our-services/redis",
+    name: "OurServicesRedisAgent",
+    component: () => import("@/pages/our-services/OurServicesRedis.vue"),
+  },
+  {
+    path: "/agent/our-services/kafka",
+    name: "OurServicesKafkaAgent",
+    component: () => import("@/pages/our-services/OurServicesKafka.vue"),
+  },
+  {
+    path: "/agent/our-services/mongodb",
+    name: "OurServicesMongoDBAgent",
+    component: () => import("@/pages/our-services/OurServicesMongoDB.vue"),
+  },
+
   // Customer Portal Routes
   {
     path: "/my-tickets",
@@ -169,6 +196,55 @@ const routes = [
     name: "ArticlePublic",
     component: () => import("@/pages/knowledge-base/Article.vue"),
     props: true,
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
+
+  // Buy Services
+  {
+    path: "/buy-services",
+    name: "BuyServices",
+    component: () => import("@/pages/buy-services/BuyServices.vue"),
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
+
+  // Our Services
+  {
+    path: "/our-services",
+    name: "OurServices",
+    component: () => import("@/pages/our-services/OurServicesLanding.vue"),
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
+  {
+    path: "/our-services/redis",
+    name: "OurServicesRedis",
+    component: () => import("@/pages/our-services/OurServicesRedis.vue"),
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
+  {
+    path: "/our-services/kafka",
+    name: "OurServicesKafka",
+    component: () => import("@/pages/our-services/OurServicesKafka.vue"),
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
+  {
+    path: "/our-services/mongodb",
+    name: "OurServicesMongoDB",
+    component: () => import("@/pages/our-services/OurServicesMongoDB.vue"),
     meta: {
       public: true,
       auth: true,

@@ -1,5 +1,7 @@
 import LucideBookOpen from "~icons/lucide/book-open";
+import LucideBriefcase from "~icons/lucide/briefcase";
 import LucideContact2 from "~icons/lucide/contact-2";
+import LucideShoppingCart from "~icons/lucide/shopping-cart";
 import LucideTicket from "~icons/lucide/ticket";
 import { OrganizationsIcon } from "../icons";
 import PhoneIcon from "../icons/PhoneIcon.vue";
@@ -31,6 +33,16 @@ export const agentPortalSidebarOptions = [
     icon: PhoneIcon,
     to: "CallLogs",
   },
+  {
+    label: __("Buy Services"),
+    icon: LucideShoppingCart,
+    to: "BuyServicesAgent",
+  },
+  {
+    label: __("Our Services"),
+    icon: LucideBriefcase,
+    to: "OurServicesAgent",
+  },
 ];
 
 export const customerPortalSidebarOptions = [
@@ -43,5 +55,15 @@ export const customerPortalSidebarOptions = [
     label: __("Knowledge Base"),
     icon: LucideBookOpen,
     to: "CustomerKnowledgeBase",
+  },
+  {
+    label: __("Buy Services"),
+    icon: LucideShoppingCart,
+    to: "BuyServices",
+  },
+  {
+    label: __("Our Services"),
+    icon: LucideBriefcase,
+    to: "OurServices",
   },
 ];
