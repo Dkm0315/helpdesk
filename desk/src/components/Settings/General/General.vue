@@ -57,6 +57,108 @@
             <Switch v-model="disableSignup" />
           </div>
         </div>
+        <hr class="my-8" />
+        <div>
+          <div class="text-base font-semibold text-gray-900">
+            {{ __("Feature Flags") }}
+          </div>
+          <div class="flex items-center justify-between mt-6">
+            <div class="flex flex-col gap-1">
+              <span class="text-base font-medium text-ink-gray-8">{{
+                __("Our Services")
+              }}</span>
+              <span class="text-p-sm text-ink-gray-6">{{
+                __("Show the Our Services page and sidebar link.")
+              }}</span>
+            </div>
+            <Switch v-model="settingsData.enableOurServices" />
+          </div>
+          <div class="flex items-center justify-between mt-6">
+            <div class="flex flex-col gap-1">
+              <span class="text-base font-medium text-ink-gray-8">{{
+                __("Buy Services")
+              }}</span>
+              <span class="text-p-sm text-ink-gray-6">{{
+                __("Show the Buy Services page and sidebar link.")
+              }}</span>
+            </div>
+            <Switch v-model="settingsData.enableBuyServices" />
+          </div>
+          <div class="flex items-center justify-between mt-6">
+            <div class="flex flex-col gap-1">
+              <span class="text-base font-medium text-ink-gray-8">{{
+                __("Wiki")
+              }}</span>
+              <span class="text-p-sm text-ink-gray-6">{{
+                __("Show the Wiki section in the sidebar.")
+              }}</span>
+            </div>
+            <Switch v-model="settingsData.enableWiki" />
+          </div>
+        </div>
+        <template v-if="authStore.isAdmin">
+          <hr class="my-8" />
+          <div>
+            <div class="text-base font-semibold text-gray-900">
+              {{ __("Our Services Content") }}
+            </div>
+            <p class="text-p-sm text-ink-gray-6 mt-1">
+              {{ __("Configure the content displayed on the Our Services page. Only System Managers can edit this.") }}
+            </p>
+            <div class="mt-6">
+              <label class="text-sm font-medium text-ink-gray-8">{{ __("SLA Disclaimer") }}</label>
+              <textarea
+                v-model="settingsData.ourServicesSlaDisclaimer"
+                class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                rows="3"
+              />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
+              <div>
+                <div class="text-sm font-medium text-ink-gray-8 mb-3">{{ __("Non-Production") }}</div>
+                <div class="space-y-3">
+                  <div>
+                    <label class="text-xs text-ink-gray-6">{{ __("Response Time") }}</label>
+                    <input
+                      v-model="settingsData.nonProductionResponseTime"
+                      type="text"
+                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-xs text-ink-gray-6">{{ __("Availability") }}</label>
+                    <input
+                      v-model="settingsData.nonProductionAvailability"
+                      type="text"
+                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="text-sm font-medium text-ink-gray-8 mb-3">{{ __("Production") }}</div>
+                <div class="space-y-3">
+                  <div>
+                    <label class="text-xs text-ink-gray-6">{{ __("Response Time") }}</label>
+                    <input
+                      v-model="settingsData.productionResponseTime"
+                      type="text"
+                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-xs text-ink-gray-6">{{ __("Availability") }}</label>
+                    <input
+                      v-model="settingsData.productionAvailability"
+                      type="text"
+                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </template>
   </SettingsLayoutBase>
@@ -79,6 +181,9 @@ import { __ } from "@/translation";
 import { disableSettingModalOutsideClick } from "../settingsModal";
 import SettingsLayoutBase from "@/components/layouts/SettingsLayoutBase.vue";
 import { HDSettings, HDSettingsSymbol } from "@/types";
+import { useAuthStore } from "@/stores/auth";
+
+const authStore = useAuthStore();
 
 const isDirty = ref(false);
 const initialData = ref<null | string>(null);
@@ -103,6 +208,14 @@ const settingsData = ref({
   disableSavedRepliesGlobalScope: false,
   enableOutsideHoursBanner: false,
   outsideWorkingHoursBannerMessage: "",
+  enableOurServices: true,
+  enableBuyServices: true,
+  enableWiki: true,
+  ourServicesSlaDisclaimer: "",
+  nonProductionResponseTime: "4 Hours",
+  nonProductionAvailability: "Business Hours",
+  productionResponseTime: "1 Hour",
+  productionAvailability: "24/7",
 });
 const disableSignup = ref(false);
 
@@ -159,6 +272,14 @@ const saveSettingsResource = createResource({
           settingsData.value.enableOutsideHoursBanner,
         outside_working_hours_message:
           settingsData.value.outsideWorkingHoursBannerMessage,
+        enable_our_services: settingsData.value.enableOurServices,
+        enable_buy_services: settingsData.value.enableBuyServices,
+        enable_wiki: settingsData.value.enableWiki,
+        our_services_sla_disclaimer: settingsData.value.ourServicesSlaDisclaimer,
+        non_production_response_time: settingsData.value.nonProductionResponseTime,
+        non_production_availability: settingsData.value.nonProductionAvailability,
+        production_response_time: settingsData.value.productionResponseTime,
+        production_availability: settingsData.value.productionAvailability,
       },
     };
   },
@@ -194,6 +315,14 @@ const transformData = (data: any) => {
     ),
     enableOutsideHoursBanner: Boolean(data.enable_outside_hours_banner),
     outsideWorkingHoursBannerMessage: data.outside_working_hours_message || "",
+    enableOurServices: data.enable_our_services !== undefined ? Boolean(data.enable_our_services) : true,
+    enableBuyServices: data.enable_buy_services !== undefined ? Boolean(data.enable_buy_services) : true,
+    enableWiki: data.enable_wiki !== undefined ? Boolean(data.enable_wiki) : true,
+    ourServicesSlaDisclaimer: data.our_services_sla_disclaimer || "",
+    nonProductionResponseTime: data.non_production_response_time || "4 Hours",
+    nonProductionAvailability: data.non_production_availability || "Business Hours",
+    productionResponseTime: data.production_response_time || "1 Hour",
+    productionAvailability: data.production_availability || "24/7",
   };
 };
 

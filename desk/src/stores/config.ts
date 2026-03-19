@@ -35,6 +35,18 @@ export const useConfigStore = defineStore("config", () => {
   const enableCommentReactions = computed(
     () => !!parseInt(config.value.enable_comment_reactions)
   );
+  const enableOurServices = computed(() => {
+    const val = config.value.enable_our_services;
+    return val === undefined || val === null ? true : !!parseInt(val);
+  });
+  const enableBuyServices = computed(() => {
+    const val = config.value.enable_buy_services;
+    return val === undefined || val === null ? true : !!parseInt(val);
+  });
+  const enableWiki = computed(() => {
+    const val = config.value.enable_wiki;
+    return val === undefined || val === null ? true : !!parseInt(val);
+  });
 
   socket.on("helpdesk:settings-updated", () => configResource.reload());
 
@@ -51,5 +63,8 @@ export const useConfigStore = defineStore("config", () => {
     assignWithinTeam,
     disableGlobalScopeForSavedReplies,
     enableCommentReactions,
+    enableOurServices,
+    enableBuyServices,
+    enableWiki,
   };
 });

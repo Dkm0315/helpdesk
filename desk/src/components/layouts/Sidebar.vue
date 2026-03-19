@@ -102,6 +102,7 @@
           </nav>
         </Section>
       </div>
+      <WikiSidebarSection :isExpanded="isExpanded" />
     </div>
     <div class="grow" />
     <div class="flex flex-col gap-2">
@@ -165,6 +166,7 @@
 <script setup lang="ts">
 import HDLogo from "@/assets/logos/HDLogo.vue";
 import { Section, SidebarLink } from "@/components";
+import WikiSidebarSection from "@/components/WikiSidebarSection.vue";
 import Apps from "@/components/Apps.vue";
 import CP from "@/components/command-palette/CP.vue";
 import { FrappeCloudIcon, InviteCustomer } from "@/components/icons";
@@ -182,6 +184,7 @@ import {
   showEmailBox,
 } from "@/pages/ticket/modalStates";
 import { useAuthStore } from "@/stores/auth";
+import { useConfigStore } from "@/stores/config";
 import { useNotificationStore } from "@/stores/notification";
 import { useSidebarStore } from "@/stores/sidebar";
 import { capture } from "@/telemetry";
@@ -233,6 +236,7 @@ const { isMobileView } = useScreenSize();
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const configStore = useConfigStore();
 const notificationStore = useNotificationStore();
 const { isExpanded, width } = storeToRefs(useSidebarStore());
 const device = useDevice();
@@ -253,6 +257,12 @@ const allViews = computed(() => {
 
   if (!isCallingEnabled.value) {
     items = items.filter((item) => item.label !== __("Call Logs"));
+  }
+  if (!configStore.enableBuyServices) {
+    items = items.filter((item) => item.label !== __("Buy Services"));
+  }
+  if (!configStore.enableOurServices) {
+    items = items.filter((item) => item.label !== __("Our Services"));
   }
 
   const options = [

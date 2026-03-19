@@ -78,6 +78,12 @@ const routes = [
     props: true,
   },
   {
+    path: "/wiki/:pageId",
+    name: "WikiPageAgent",
+    component: () => import("@/pages/wiki/WikiPage.vue"),
+    props: true,
+  },
+  {
     path: "/customers",
     name: "CustomerList",
     component: () => import("@/pages/desk/customer/Customers.vue"),
@@ -125,19 +131,10 @@ const routes = [
     component: () => import("@/pages/our-services/OurServicesLanding.vue"),
   },
   {
-    path: "/agent/our-services/redis",
-    name: "OurServicesRedisAgent",
-    component: () => import("@/pages/our-services/OurServicesRedis.vue"),
-  },
-  {
-    path: "/agent/our-services/kafka",
-    name: "OurServicesKafkaAgent",
-    component: () => import("@/pages/our-services/OurServicesKafka.vue"),
-  },
-  {
-    path: "/agent/our-services/mongodb",
-    name: "OurServicesMongoDBAgent",
-    component: () => import("@/pages/our-services/OurServicesMongoDB.vue"),
+    path: "/agent/our-services/:technologyId",
+    name: "OurServicesTechnologyAgent",
+    component: () => import("@/pages/our-services/OurServicesTechnology.vue"),
+    props: true,
   },
 
   // Customer Portal Routes
@@ -201,6 +198,16 @@ const routes = [
       auth: true,
     },
   },
+  {
+    path: "/wiki-public/:pageId",
+    name: "WikiPageCustomer",
+    component: () => import("@/pages/wiki/WikiPage.vue"),
+    props: true,
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
 
   // Buy Services
   {
@@ -224,27 +231,10 @@ const routes = [
     },
   },
   {
-    path: "/our-services/redis",
-    name: "OurServicesRedis",
-    component: () => import("@/pages/our-services/OurServicesRedis.vue"),
-    meta: {
-      public: true,
-      auth: true,
-    },
-  },
-  {
-    path: "/our-services/kafka",
-    name: "OurServicesKafka",
-    component: () => import("@/pages/our-services/OurServicesKafka.vue"),
-    meta: {
-      public: true,
-      auth: true,
-    },
-  },
-  {
-    path: "/our-services/mongodb",
-    name: "OurServicesMongoDB",
-    component: () => import("@/pages/our-services/OurServicesMongoDB.vue"),
+    path: "/our-services/:technologyId",
+    name: "OurServicesTechnology",
+    component: () => import("@/pages/our-services/OurServicesTechnology.vue"),
+    props: true,
     meta: {
       public: true,
       auth: true,

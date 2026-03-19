@@ -631,6 +631,9 @@ export interface HDSettings {
   disableSavedRepliesGlobalScope: boolean;
   enableOutsideHoursBanner: boolean;
   outsideWorkingHoursBannerMessage: string;
+  enableOurServices: boolean;
+  enableBuyServices: boolean;
+  enableWiki: boolean;
 }
 
 export interface HolidayList {

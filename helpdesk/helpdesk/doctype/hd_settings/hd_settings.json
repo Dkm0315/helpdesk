@@ -77,7 +77,20 @@
   "reply_email_to_agent_content",
   "reply_from_agent_section",
   "enable_reply_email_via_agent",
-  "reply_via_agent_email_content"
+  "reply_via_agent_email_content",
+  "feature_flags_tab",
+  "enable_our_services",
+  "enable_buy_services",
+  "column_break_feature_flags",
+  "enable_wiki",
+  "our_services_tab",
+  "our_services_sla_disclaimer",
+  "our_services_metrics_section",
+  "non_production_response_time",
+  "non_production_availability",
+  "column_break_our_services_metrics",
+  "production_response_time",
+  "production_availability"
  ],
  "fields": [
   {
@@ -504,6 +517,81 @@
    "fieldname": "enable_outside_hours_banner",
    "fieldtype": "Check",
    "label": "Apply outside working hours"
+  },
+  {
+   "fieldname": "feature_flags_tab",
+   "fieldtype": "Tab Break",
+   "label": "Feature Flags"
+  },
+  {
+   "default": "1",
+   "description": "Show the Our Services page and sidebar link",
+   "fieldname": "enable_our_services",
+   "fieldtype": "Check",
+   "label": "Enable Our Services"
+  },
+  {
+   "default": "1",
+   "description": "Show the Buy Services page and sidebar link",
+   "fieldname": "enable_buy_services",
+   "fieldtype": "Check",
+   "label": "Enable Buy Services"
+  },
+  {
+   "fieldname": "column_break_feature_flags",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Show the Wiki section in the sidebar",
+   "fieldname": "enable_wiki",
+   "fieldtype": "Check",
+   "label": "Enable Wiki"
+  },
+  {
+   "fieldname": "our_services_tab",
+   "fieldtype": "Tab Break",
+   "label": "Our Services Content"
+  },
+  {
+   "default": "All support services are governed by your active service agreement. Response and resolution commitments apply only to contracted environments and technologies. Targets listed below are best-effort unless a signed SLA specifies otherwise.",
+   "description": "The SLA disclaimer text shown at the top of the Our Services page.",
+   "fieldname": "our_services_sla_disclaimer",
+   "fieldtype": "Small Text",
+   "label": "SLA Disclaimer"
+  },
+  {
+   "fieldname": "our_services_metrics_section",
+   "fieldtype": "Section Break",
+   "label": "Response Commitments"
+  },
+  {
+   "default": "4 Hours",
+   "fieldname": "non_production_response_time",
+   "fieldtype": "Data",
+   "label": "Non-Production Response Time"
+  },
+  {
+   "default": "Business Hours",
+   "fieldname": "non_production_availability",
+   "fieldtype": "Data",
+   "label": "Non-Production Availability"
+  },
+  {
+   "fieldname": "column_break_our_services_metrics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1 Hour",
+   "fieldname": "production_response_time",
+   "fieldtype": "Data",
+   "label": "Production Response Time"
+  },
+  {
+   "default": "24/7",
+   "fieldname": "production_availability",
+   "fieldtype": "Data",
+   "label": "Production Availability"
   }
  ],
  "grid_page_length": 50,

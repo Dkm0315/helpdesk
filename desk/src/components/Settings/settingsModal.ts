@@ -26,6 +26,10 @@ import { useAuthStore } from "@/stores/auth";
 import General from "./General/General.vue";
 import SettingsGear from "~icons/lucide/settings";
 import SavedReplyIcon from "../icons/SavedReplyIcon.vue";
+import OurServicesSettings from "./OurServices/OurServicesSettings.vue";
+import WikiSettings from "./Wiki/WikiSettings.vue";
+import LucideBookOpen from "~icons/lucide/book-open";
+import LucideWrench from "~icons/lucide/wrench";
 
 export const showSettingsModal = ref(false);
 
@@ -123,6 +127,24 @@ export const tabs = computed(() => {
       ],
     },
     {
+      label: __("Content Management"),
+      condition: () => auth.isAdmin,
+      items: [
+        {
+          label: __("Our Services"),
+          icon: markRaw(LucideWrench),
+          component: markRaw(OurServicesSettings),
+          condition: () => auth.isAdmin,
+        },
+        {
+          label: __("Wiki Pages"),
+          icon: markRaw(LucideBookOpen),
+          component: markRaw(WikiSettings),
+          condition: () => auth.isAdmin,
+        },
+      ],
+    },
+    {
       label: __("Integrations"),
       items: [
         {
@@ -165,7 +187,9 @@ type TabName =
   | "Assignment Rules"
   | "Field Dependencies"
   | "Telephony"
-  | "Saved Replies";
+  | "Saved Replies"
+  | "Our Services"
+  | "Wiki Pages";
 
 export const setActiveSettingsTab = (tabName: TabName) => {
   activeTab.value =

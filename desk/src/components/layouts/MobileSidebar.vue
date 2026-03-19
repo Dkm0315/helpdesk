@@ -89,6 +89,7 @@
               </nav>
             </Section>
           </div>
+          <WikiSidebarSection :isExpanded="true" />
         </div>
       </TransitionChild>
       <TransitionChild
@@ -118,6 +119,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import { Section } from "@/components";
 import SidebarLink from "@/components/SidebarLink.vue";
+import WikiSidebarSection from "@/components/WikiSidebarSection.vue";
 import UserMenu from "@/components/UserMenu.vue";
 import { useNotificationStore } from "@/stores/notification";
 

@@ -6,18 +6,21 @@
       </template>
     </LayoutHeader>
     <div
-      class="flex flex-col gap-6 py-6 h-full flex-1 self-center overflow-auto mx-auto w-full max-w-4xl px-5"
+      class="flex flex-col gap-6 py-6 self-center mx-auto w-full max-w-4xl px-5"
     >
       <!-- SLA Disclaimer -->
-      <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 text-sm text-gray-500 italic">
-        {{ __("The support services described herein are subject to the terms and conditions outlined in your service agreement. SLA commitments apply only to environments and technologies covered under your active contract. Response and resolution times are best-effort targets unless otherwise specified in a signed SLA document.") }}
+      <div
+        v-if="pageContent.data?.sla_disclaimer"
+        class="border border-gray-200 rounded-lg p-4 bg-gray-50 text-sm text-gray-500 italic"
+      >
+        {{ pageContent.data.sla_disclaimer }}
       </div>
 
       <!-- Support Metrics -->
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">{{ __("Support Metrics") }}</h2>
+        <h2 class="text-lg font-semibold text-gray-900">{{ __("Response Commitments") }}</h2>
         <p class="text-sm text-gray-600 mt-1">
-          {{ __("Our standard response time commitments based on environment type.") }}
+          {{ __("Standard response time targets based on environment classification.") }}
         </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <!-- Non-production -->
@@ -26,11 +29,11 @@
             <div class="mt-3 space-y-2">
               <div class="flex justify-between text-sm">
                 <span class="text-gray-600">{{ __("Response Time") }}</span>
-                <span class="font-medium text-gray-900">{{ __("4 Hours") }}</span>
+                <span class="font-medium text-gray-900">{{ pageContent.data?.non_production_response_time || __("4 Hours") }}</span>
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-600">{{ __("Availability") }}</span>
-                <span class="font-medium text-gray-900">{{ __("Business Hours") }}</span>
+                <span class="font-medium text-gray-900">{{ pageContent.data?.non_production_availability || __("Business Hours") }}</span>
               </div>
             </div>
           </div>
@@ -40,89 +43,56 @@
             <div class="mt-3 space-y-2">
               <div class="flex justify-between text-sm">
                 <span class="text-gray-600">{{ __("Response Time") }}</span>
-                <span class="font-medium text-gray-900">{{ __("1 Hour") }}</span>
+                <span class="font-medium text-gray-900">{{ pageContent.data?.production_response_time || __("1 Hour") }}</span>
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-600">{{ __("Availability") }}</span>
-                <span class="font-medium text-gray-900">{{ __("24/7") }}</span>
+                <span class="font-medium text-gray-900">{{ pageContent.data?.production_availability || __("24/7") }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Engagement Model -->
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900">{{ __("Engagement Model") }}</h2>
-        <p class="text-sm text-gray-600 mt-2">
-          {{ __("Our support is structured across multiple tiers to ensure comprehensive coverage, from day-to-day operations through to advanced advisory and professional services.") }}
-        </p>
-        <ul class="list-disc pl-5 text-sm text-gray-600 space-y-1 mt-2">
-          <li>{{ __("L1 - Operations: First-line monitoring, basic checks, and documented runbook execution (Customer/Shared Ops Team)") }}</li>
-          <li>{{ __("L2 - Expert Support: Incident analysis, configuration tuning, failover guidance, and proactive recommendations (Provided by Us)") }}</li>
-          <li>{{ __("L3 - Advanced Advisory: Deep technical advisory, complex issue analysis, and upgrade path validation (Best-Effort)") }}</li>
-          <li>{{ __("Professional Services: Implementation, migration, benchmarking, and knowledge transfer engagements") }}</li>
-          <li>{{ __("Solution Architect: Architecture design, requirements assessment, best practices reviews, and training") }}</li>
-        </ul>
-      </div>
-
-      <!-- Technology Cards -->
+      <!-- Supported Technologies -->
       <div>
         <h2 class="text-lg font-semibold text-gray-900">{{ __("Supported Technologies") }}</h2>
         <p class="text-sm text-gray-600 mt-1">
-          {{ __("Select a technology to view detailed support structure, responsibilities, and service descriptions.") }}
+          {{ __("Select a technology to view the detailed support structure and service offerings.") }}
         </p>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-          <!-- Redis -->
-          <RouterLink
-            :to="{ name: redisRoute }"
-            class="border rounded-lg p-5 hover:shadow-md hover:border-gray-300 transition cursor-pointer block"
-          >
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-                <span class="text-red-600 font-bold text-lg">R</span>
-              </div>
-              <h3 class="text-base font-medium text-gray-900">{{ __("Redis") }}</h3>
-            </div>
-            <p class="text-sm text-gray-600">
-              {{ __("In-memory data store support including replication, failover, memory management, and performance optimization.") }}
-            </p>
-            <span class="text-sm font-medium text-blue-600 mt-3 inline-block">{{ __("View Details") }} &rarr;</span>
-          </RouterLink>
 
-          <!-- Kafka -->
-          <RouterLink
-            :to="{ name: kafkaRoute }"
-            class="border rounded-lg p-5 hover:shadow-md hover:border-gray-300 transition cursor-pointer block"
-          >
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                <span class="text-orange-600 font-bold text-lg">K</span>
-              </div>
-              <h3 class="text-base font-medium text-gray-900">{{ __("Kafka") }}</h3>
-            </div>
-            <p class="text-sm text-gray-600">
-              {{ __("Distributed event streaming platform support including broker management, partition strategy, and KRaft migration.") }}
-            </p>
-            <span class="text-sm font-medium text-blue-600 mt-3 inline-block">{{ __("View Details") }} &rarr;</span>
-          </RouterLink>
+        <div v-if="technologies.loading" class="flex justify-center py-8">
+          <Spinner class="h-5 w-5 text-gray-500" />
+        </div>
 
-          <!-- MongoDB -->
+        <div
+          v-else-if="technologies.data?.length"
+          class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4"
+        >
           <RouterLink
-            :to="{ name: mongoRoute }"
+            v-for="tech in technologies.data"
+            :key="tech.name"
+            :to="{ name: detailRoute, params: { technologyId: tech.technology_name } }"
             class="border rounded-lg p-5 hover:shadow-md hover:border-gray-300 transition cursor-pointer block"
           >
             <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <span class="text-green-600 font-bold text-lg">M</span>
+              <div
+                class="w-10 h-10 rounded-lg flex items-center justify-center"
+                :class="iconClasses(tech.icon_color)"
+              >
+                <span class="font-bold text-lg" :class="iconTextClass(tech.icon_color)">
+                  {{ tech.icon_letter }}
+                </span>
               </div>
-              <h3 class="text-base font-medium text-gray-900">{{ __("MongoDB") }}</h3>
+              <h3 class="text-base font-medium text-gray-900">{{ tech.technology_name }}</h3>
             </div>
-            <p class="text-sm text-gray-600">
-              {{ __("Document database support including replica sets, WiredTiger tuning, sharding advisory, and security configuration.") }}
-            </p>
+            <p class="text-sm text-gray-600">{{ tech.description }}</p>
             <span class="text-sm font-medium text-blue-600 mt-3 inline-block">{{ __("View Details") }} &rarr;</span>
           </RouterLink>
+        </div>
+
+        <div v-else class="text-sm text-gray-500 mt-4">
+          {{ __("No supported technologies configured yet.") }}
         </div>
       </div>
     </div>
@@ -133,17 +103,38 @@
 import { LayoutHeader } from "@/components";
 import { __ } from "@/translation";
 import { isCustomerPortal } from "@/utils";
-import { Breadcrumbs, usePageMeta } from "frappe-ui";
+import { Breadcrumbs, createResource, Spinner, usePageMeta } from "frappe-ui";
 import { computed } from "vue";
 
-const redisRoute = computed(() =>
-  isCustomerPortal.value ? "OurServicesRedis" : "OurServicesRedisAgent"
-);
-const kafkaRoute = computed(() =>
-  isCustomerPortal.value ? "OurServicesKafka" : "OurServicesKafkaAgent"
-);
-const mongoRoute = computed(() =>
-  isCustomerPortal.value ? "OurServicesMongoDB" : "OurServicesMongoDBAgent"
+const COLOR_MAP: Record<string, { bg: string; text: string }> = {
+  Red: { bg: "bg-red-100", text: "text-red-600" },
+  Orange: { bg: "bg-orange-100", text: "text-orange-600" },
+  Green: { bg: "bg-green-100", text: "text-green-600" },
+  Blue: { bg: "bg-blue-100", text: "text-blue-600" },
+  Purple: { bg: "bg-purple-100", text: "text-purple-600" },
+  Indigo: { bg: "bg-indigo-100", text: "text-indigo-600" },
+};
+
+function iconClasses(color: string) {
+  return COLOR_MAP[color]?.bg || "bg-gray-100";
+}
+
+function iconTextClass(color: string) {
+  return COLOR_MAP[color]?.text || "text-gray-600";
+}
+
+const pageContent = createResource({
+  url: "helpdesk.api.services.get_services_page_content",
+  auto: true,
+});
+
+const technologies = createResource({
+  url: "helpdesk.api.services.get_supported_technologies",
+  auto: true,
+});
+
+const detailRoute = computed(() =>
+  isCustomerPortal.value ? "OurServicesTechnology" : "OurServicesTechnologyAgent"
 );
 
 const breadcrumbs = computed(() => [
