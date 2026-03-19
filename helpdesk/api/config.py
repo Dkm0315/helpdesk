@@ -19,7 +19,8 @@ def get_config():
         "enable_buy_services",
         "enable_wiki",
     ]
-    res = frappe.get_value(doctype="HD Settings", fieldname=fields, as_dict=True)
+    settings = frappe.get_single("HD Settings")
+    res = frappe._dict({f: getattr(settings, f, None) for f in fields})
 
     res.favicon = (
         res.favicon
