@@ -106,7 +106,7 @@ watch(
 );
 
 const breadcrumbs = computed(() => {
-  const items = [{ label: __("OSS Manager"), route: { name: "TicketsAgent" } }];
+  const items = [{ label: __("Documentation"), route: { name: "TicketsAgent" } }];
   if (pageContent.data?.page_title) {
     items.push({
       label: pageContent.data.page_title,
@@ -117,7 +117,7 @@ const breadcrumbs = computed(() => {
 });
 
 usePageMeta(() => ({
-  title: pageContent.data?.page_title || __("OSS Manager"),
+  title: pageContent.data?.page_title || __("Documentation"),
 }));
 </script>
 
