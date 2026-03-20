@@ -101,7 +101,7 @@ const navigationItems = computed(() => {
     });
   }
   items.push({
-    title: __("Knowledge Base"),
+    title: __("Get Started"),
     icon: () => h(LucideBookOpen),
     route: {
       name: isCustomerPortal.value

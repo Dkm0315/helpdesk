@@ -168,7 +168,7 @@ function resetState() {
 const breadcrumbs = computed(() => {
   const options: Array<{ label: string; route?: { name: string } }> = [
     {
-      label: __("Knowledge Base"),
+      label: __("Get Started"),
       route: { name: "AgentKnowledgeBase" },
     },
   ];

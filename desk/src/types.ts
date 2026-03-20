@@ -634,6 +634,7 @@ export interface HDSettings {
   enableOurServices: boolean;
   enableBuyServices: boolean;
   enableWiki: boolean;
+  ourServicesContent: string;
 }
 
 export interface HolidayList {

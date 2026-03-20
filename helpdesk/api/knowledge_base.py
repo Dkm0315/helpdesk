@@ -112,6 +112,23 @@ def get_category_articles(category: str):
 
 
 @frappe.whitelist()
+def get_all_published_articles():
+	"""Return all published articles across all categories."""
+	articles = frappe.get_all(
+		"HD Article",
+		filters={"status": "Published"},
+		fields=["name", "title", "published_on", "modified", "author", "content"],
+		order_by="modified desc",
+	)
+	for article in articles:
+		article["author"] = get_user_info_for_avatar(article["author"])
+		soup = BeautifulSoup(article["content"], "html.parser")
+		article["content"] = str(soup.text)[:100]
+
+	return articles
+
+
+@frappe.whitelist()
 def merge_category(source: str, target: str):
     frappe.has_permission("HD Article Category", "delete", throw=True)
 

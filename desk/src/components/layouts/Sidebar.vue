@@ -58,6 +58,7 @@
       </SidebarLink>
     </div>
     <div class="overflow-y-auto overflow-x-hidden">
+      <WikiSidebarSection :isExpanded="isExpanded" />
       <div v-for="view in allViews" :key="view.label">
         <div
           v-if="!view.hideLabel && !isExpanded && view.views?.length"
@@ -102,7 +103,6 @@
           </nav>
         </Section>
       </div>
-      <WikiSidebarSection :isExpanded="isExpanded" />
     </div>
     <div class="grow" />
     <div class="flex flex-col gap-2">
@@ -534,76 +534,17 @@ const steps = [
 
 const articles = ref([
   {
-    title: "Introduction",
+    title: "OSS Manager",
     opened: false,
     subArticles: [
       { name: "introduction", title: "Introduction" },
       { name: "setting-up", title: "Setting up" },
-    ],
-  },
-  {
-    title: "Getting Started",
-    opened: false,
-    subArticles: [
-      {
-        name: "lesson-1-your-first-ticket",
-        title: "Creating a ticket",
-      },
-      {
-        name: "lesson-2understanding-ticket-view",
-        title: "Understanding ticket view",
-      },
-      {
-        name: "lesson-3-agents-teams",
-        title: "Agents & Teams",
-      },
-      {
-        name: "customers-contacts",
-        title: "Customers & Contacts",
-      },
-      {
-        name: "lesson-4-knowledge-base",
-        title: "Knowledge Base",
-      },
-      {
-        name: "customer-portal",
-        title: "Customer Portal",
-      },
-    ],
-  },
-  {
-    title: "Masters",
-    opened: false,
-    subArticles: [
-      { name: "ticket", title: "Ticket" },
-      { name: "agent", title: "Agent" },
-      { name: "team", title: "Team" },
-      { name: "contact", title: "Contact" },
-      { name: "customer", title: "Customer" },
-      { name: "knowledge-base", title: "Knowledge Base" },
-      { name: "saved-replies", title: "Saved Replies" },
-      { name: "service-level-agreement", title: "Service Level Agreement" },
-      { name: "ticket-type", title: "Ticket Type" },
-      { name: "ticket-priority", title: "Ticket Priority" },
-    ],
-  },
-  {
-    title: "Customizations",
-    opened: false,
-    subArticles: [
+      { name: "agents-teams", title: "Agents & Teams" },
+      { name: "customers-contacts", title: "Customers & Contacts" },
+      { name: "customer-portal", title: "Customer Portal" },
       { name: "custom-actions", title: "Custom Actions" },
-      { name: "field-dependency", title: "Field Dependency" },
       { name: "custom-views", title: "Custom Views" },
-      {
-        name: "settings",
-        title: "Settings",
-      },
-    ],
-  },
-  {
-    title: "Frappe Helpdesk Mobile",
-    opened: false,
-    subArticles: [
+      { name: "settings", title: "Settings" },
       { name: "pwa-installation", title: "Mobile App Installation" },
     ],
   },

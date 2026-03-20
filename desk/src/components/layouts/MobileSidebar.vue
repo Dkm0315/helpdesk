@@ -49,6 +49,7 @@
             </div>
           </div>
 
+          <WikiSidebarSection :isExpanded="true" />
           <div v-for="view in allViews" :key="view.label">
             <div
               v-if="!view.hideLabel && view.views?.length"
@@ -89,7 +90,6 @@
               </nav>
             </Section>
           </div>
-          <WikiSidebarSection :isExpanded="true" />
         </div>
       </TransitionChild>
       <TransitionChild

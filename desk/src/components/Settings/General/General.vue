@@ -103,59 +103,17 @@
               {{ __("Our Services Content") }}
             </div>
             <p class="text-p-sm text-ink-gray-6 mt-1">
-              {{ __("Configure the content displayed on the Our Services page. Only System Managers can edit this.") }}
+              {{ __("Write the content displayed on the Our Services page. Supports Markdown formatting.") }}
             </p>
             <div class="mt-6">
-              <label class="text-sm font-medium text-ink-gray-8">{{ __("SLA Disclaimer") }}</label>
-              <textarea
-                v-model="settingsData.ourServicesSlaDisclaimer"
-                class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                rows="3"
+              <TextEditor
+                editor-class="!prose-sm max-w-full overflow-auto min-h-[300px] max-h-[600px] py-1.5 px-2 rounded-b border border-[--surface-gray-2] bg-surface-gray-2 placeholder-ink-gray-4 hover:border-outline-gray-modals hover:shadow-sm focus:bg-surface-white focus:border-outline-gray-4 focus:shadow-sm focus:ring-0 focus-visible:ring-2 focus-visible:ring-outline-gray-3 text-ink-gray-8 transition-colors -mt-0.5"
+                :bubble-menu="false"
+                :content="settingsData.ourServicesContent"
+                @change="settingsData.ourServicesContent = $event"
+                :fixed-menu="editorMenu"
+                :placeholder="__('Write about your services here...')"
               />
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
-              <div>
-                <div class="text-sm font-medium text-ink-gray-8 mb-3">{{ __("Non-Production") }}</div>
-                <div class="space-y-3">
-                  <div>
-                    <label class="text-xs text-ink-gray-6">{{ __("Response Time") }}</label>
-                    <input
-                      v-model="settingsData.nonProductionResponseTime"
-                      type="text"
-                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label class="text-xs text-ink-gray-6">{{ __("Availability") }}</label>
-                    <input
-                      v-model="settingsData.nonProductionAvailability"
-                      type="text"
-                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div class="text-sm font-medium text-ink-gray-8 mb-3">{{ __("Production") }}</div>
-                <div class="space-y-3">
-                  <div>
-                    <label class="text-xs text-ink-gray-6">{{ __("Response Time") }}</label>
-                    <input
-                      v-model="settingsData.productionResponseTime"
-                      type="text"
-                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label class="text-xs text-ink-gray-6">{{ __("Availability") }}</label>
-                    <input
-                      v-model="settingsData.productionAvailability"
-                      type="text"
-                      class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </template>
@@ -171,6 +129,7 @@ import {
   createResource,
   LoadingIndicator,
   Switch,
+  TextEditor,
   toast,
 } from "frappe-ui";
 import Branding from "./components/Branding.vue";
@@ -184,6 +143,20 @@ import { HDSettings, HDSettingsSymbol } from "@/types";
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
+
+const editorMenu = [
+  "Paragraph",
+  ["Heading 2", "Heading 3", "Heading 4"],
+  "Separator",
+  "Bold",
+  "Italic",
+  "Bullet List",
+  "Numbered List",
+  "Separator",
+  "Link",
+  "Blockquote",
+  "Code",
+];
 
 const isDirty = ref(false);
 const initialData = ref<null | string>(null);
@@ -211,11 +184,7 @@ const settingsData = ref({
   enableOurServices: true,
   enableBuyServices: true,
   enableWiki: true,
-  ourServicesSlaDisclaimer: "",
-  nonProductionResponseTime: "4 Hours",
-  nonProductionAvailability: "Business Hours",
-  productionResponseTime: "1 Hour",
-  productionAvailability: "24/7",
+  ourServicesContent: "",
 });
 const disableSignup = ref(false);
 
@@ -275,11 +244,7 @@ const saveSettingsResource = createResource({
         enable_our_services: settingsData.value.enableOurServices,
         enable_buy_services: settingsData.value.enableBuyServices,
         enable_wiki: settingsData.value.enableWiki,
-        our_services_sla_disclaimer: settingsData.value.ourServicesSlaDisclaimer,
-        non_production_response_time: settingsData.value.nonProductionResponseTime,
-        non_production_availability: settingsData.value.nonProductionAvailability,
-        production_response_time: settingsData.value.productionResponseTime,
-        production_availability: settingsData.value.productionAvailability,
+        our_services_content: settingsData.value.ourServicesContent,
       },
     };
   },
@@ -318,11 +283,7 @@ const transformData = (data: any) => {
     enableOurServices: data.enable_our_services !== undefined ? Boolean(data.enable_our_services) : true,
     enableBuyServices: data.enable_buy_services !== undefined ? Boolean(data.enable_buy_services) : true,
     enableWiki: data.enable_wiki !== undefined ? Boolean(data.enable_wiki) : true,
-    ourServicesSlaDisclaimer: data.our_services_sla_disclaimer || "",
-    nonProductionResponseTime: data.non_production_response_time || "4 Hours",
-    nonProductionAvailability: data.non_production_availability || "Business Hours",
-    productionResponseTime: data.production_response_time || "1 Hour",
-    productionAvailability: data.production_availability || "24/7",
+    ourServicesContent: data.our_services_content || "",
   };
 };
 

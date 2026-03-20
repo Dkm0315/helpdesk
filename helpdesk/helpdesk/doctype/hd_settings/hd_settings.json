@@ -84,13 +84,7 @@
   "column_break_feature_flags",
   "enable_wiki",
   "our_services_tab",
-  "our_services_sla_disclaimer",
-  "our_services_metrics_section",
-  "non_production_response_time",
-  "non_production_availability",
-  "column_break_our_services_metrics",
-  "production_response_time",
-  "production_availability"
+  "our_services_content"
  ],
  "fields": [
   {
@@ -554,44 +548,11 @@
    "label": "Our Services Content"
   },
   {
-   "default": "All support services are governed by your active service agreement. Response and resolution commitments apply only to contracted environments and technologies. Targets listed below are best-effort unless a signed SLA specifies otherwise.",
-   "description": "The SLA disclaimer text shown at the top of the Our Services page.",
-   "fieldname": "our_services_sla_disclaimer",
-   "fieldtype": "Small Text",
-   "label": "SLA Disclaimer"
-  },
-  {
-   "fieldname": "our_services_metrics_section",
-   "fieldtype": "Section Break",
-   "label": "Response Commitments"
-  },
-  {
-   "default": "4 Hours",
-   "fieldname": "non_production_response_time",
-   "fieldtype": "Data",
-   "label": "Non-Production Response Time"
-  },
-  {
-   "default": "Business Hours",
-   "fieldname": "non_production_availability",
-   "fieldtype": "Data",
-   "label": "Non-Production Availability"
-  },
-  {
-   "fieldname": "column_break_our_services_metrics",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "1 Hour",
-   "fieldname": "production_response_time",
-   "fieldtype": "Data",
-   "label": "Production Response Time"
-  },
-  {
-   "default": "24/7",
-   "fieldname": "production_availability",
-   "fieldtype": "Data",
-   "label": "Production Availability"
+   "default": "# Our Services\n\nWe provide comprehensive support and managed services for open-source technologies. Our team handles deployment, monitoring, optimization, and troubleshooting so you can focus on building your product.\n\n## Redis\n\nWe offer full lifecycle management for Redis instances including:\n\n- **Deployment & Configuration** — Cluster setup, sentinel configuration, and performance tuning\n- **Monitoring & Alerting** — Real-time metrics, memory usage tracking, and automated alerts\n- **Backup & Recovery** — Scheduled snapshots, point-in-time recovery, and disaster recovery planning\n- **Performance Optimization** — Key eviction policies, memory management, and query optimization\n\n## Apache Kafka\n\nEnd-to-end Kafka management covering:\n\n- **Cluster Operations** — Broker provisioning, topic management, and partition rebalancing\n- **Monitoring & Observability** — Consumer lag tracking, throughput metrics, and health dashboards\n- **Schema Management** — Schema registry setup, compatibility checks, and evolution strategies\n- **Security** — ACL configuration, encryption in transit, and authentication setup\n\n## MongoDB\n\nComplete MongoDB support including:\n\n- **Deployment & Scaling** — Replica set configuration, sharding strategies, and capacity planning\n- **Performance Tuning** — Index optimization, query profiling, and aggregation pipeline optimization\n- **Backup & Restore** — Automated backups, oplog-based recovery, and cross-region replication\n- **Security & Compliance** — Role-based access control, encryption at rest, and audit logging\n\n---\n\n*For additional technologies or custom service requirements, please reach out to our team.*",
+   "description": "The content displayed on the Our Services page. Supports rich text formatting.",
+   "fieldname": "our_services_content",
+   "fieldtype": "Markdown Editor",
+   "label": "Our Services Content"
   }
  ],
  "grid_page_length": 50,

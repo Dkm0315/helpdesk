@@ -429,7 +429,7 @@ const articleActions = computed(() => [
 const breadcrumbs = computed(() => {
   const items: Breadcrumb[] = [
     {
-      label: __("Knowledge Base"),
+      label: __("Get Started"),
       route: {
         name: isCustomerPortal.value
           ? "CustomerKnowledgeBase"

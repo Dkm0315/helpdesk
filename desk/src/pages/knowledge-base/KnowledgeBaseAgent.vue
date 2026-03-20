@@ -3,7 +3,7 @@
     <LayoutHeader>
       <template #left-header>
         <div class="text-lg font-medium text-gray-900">
-          {{ __("Knowledge Base") }}
+          {{ __("Get Started") }}
         </div>
       </template>
       <template #right-header>
@@ -431,7 +431,7 @@ onMounted(() => {
 
 usePageMeta(() => {
   return {
-    title: __("Knowledge Base"),
+    title: __("Get Started"),
   };
 });
 </script>

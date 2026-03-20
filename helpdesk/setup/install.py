@@ -32,6 +32,8 @@ def after_install():
     add_property_setters()
     add_website_settings_permission()
     add_email_template_perms_for_agent_and_agent_manager()
+    set_default_our_services_content()
+    setup_oss_manager_wiki()
     # Always keep this at last, because sql_ddl makes the db commit
     add_fts_index()
 
@@ -403,3 +405,15 @@ def add_index_if_not_exists(table, column, index_name):
             table=table, index_name=index_name, column=column
         )
     )
+
+
+def set_default_our_services_content():
+    from helpdesk.patches.set_default_our_services_content import execute
+
+    execute()
+
+
+def setup_oss_manager_wiki():
+    from helpdesk.patches.setup_oss_manager_wiki import execute
+
+    execute()
