@@ -1,5 +1,6 @@
 import LucideBriefcase from "~icons/lucide/briefcase";
 import LucideContact2 from "~icons/lucide/contact-2";
+import LucideRocket from "~icons/lucide/rocket";
 import LucideShoppingCart from "~icons/lucide/shopping-cart";
 import LucideTicket from "~icons/lucide/ticket";
 import { OrganizationsIcon } from "../icons";
@@ -11,6 +12,11 @@ export const agentPortalSidebarOptions = [
     label: __("Tickets"),
     icon: LucideTicket,
     to: "TicketsAgent",
+  },
+  {
+    label: __("Get Started"),
+    icon: LucideRocket,
+    to: "AgentKnowledgeBase",
   },
   {
     label: __("Customers"),
@@ -44,6 +50,11 @@ export const customerPortalSidebarOptions = [
     label: __("Tickets"),
     icon: LucideTicket,
     to: "TicketsCustomer",
+  },
+  {
+    label: __("Get Started"),
+    icon: LucideRocket,
+    to: "CustomerKnowledgeBase",
   },
   {
     label: __("Our Services"),

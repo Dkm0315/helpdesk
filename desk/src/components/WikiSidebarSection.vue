@@ -1,5 +1,5 @@
 <template>
-  <div v-if="enableWiki && wikiPages.length">
+  <div v-if="enableWiki && hasPages">
     <!-- Documentation toggle -->
     <div
       class="-all flex h-7 cursor-pointer items-center rounded pl-2 pr-1 text-gray-800 duration-300 ease-in-out"
@@ -36,20 +36,32 @@
       </div>
     </div>
 
-    <!-- All wiki pages flat list -->
+    <!-- Flattened wiki pages with category headers -->
     <div
       v-show="isOpen && isExpanded"
       class="ml-3 border-l border-gray-200 pl-1"
     >
-      <SidebarLink
-        v-for="page in wikiPages"
-        :key="page.name"
-        :label="page.title"
-        :to="getPageRoute(page.name)"
-        :is-expanded="isExpanded"
-        :is-active="isActivePage(page.name)"
-        class="my-0.5"
-      />
+      <template v-for="space in wikiData.data" :key="space.route">
+        <template
+          v-for="(pages, groupName) in space.groups"
+          :key="groupName"
+        >
+          <div
+            class="px-2 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide truncate"
+          >
+            {{ groupName }}
+          </div>
+          <SidebarLink
+            v-for="page in pages"
+            :key="page.name"
+            :label="page.title"
+            :to="getPageRoute(page.name)"
+            :is-expanded="isExpanded"
+            :is-active="isActivePage(page.name)"
+            class="my-0.5"
+          />
+        </template>
+      </template>
     </div>
   </div>
 </template>
@@ -78,18 +90,11 @@ const wikiData = createResource({
   cache: ["wikiSidebarData"],
 });
 
-// Flatten all pages from all spaces and groups into one list
-const wikiPages = computed(() => {
-  if (!wikiData.data?.length) return [];
-  const pages: { name: string; title: string }[] = [];
-  for (const space of wikiData.data) {
-    for (const groupPages of Object.values(space.groups) as any[]) {
-      for (const page of groupPages) {
-        pages.push(page);
-      }
-    }
-  }
-  return pages;
+const hasPages = computed(() => {
+  if (!wikiData.data?.length) return false;
+  return wikiData.data.some(
+    (space: any) => Object.keys(space.groups).length > 0
+  );
 });
 
 function getPageRoute(pageName: string) {

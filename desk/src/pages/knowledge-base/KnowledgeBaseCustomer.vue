@@ -18,26 +18,8 @@
         :autofocus="true"
       />
 
-      <!-- Tab Switcher -->
-      <div class="flex gap-4 border-b border-gray-200">
-        <button
-          class="pb-2 text-sm font-medium transition-colors"
-          :class="activeTab === 'faq' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'"
-          @click="activeTab = 'faq'"
-        >
-          {{ __("FAQ") }}
-        </button>
-        <button
-          class="pb-2 text-sm font-medium transition-colors"
-          :class="activeTab === 'categories' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'"
-          @click="activeTab = 'categories'"
-        >
-          {{ __("Categories") }}
-        </button>
-      </div>
-
       <!-- FAQ Articles -->
-      <section v-if="activeTab === 'faq'" class="flex flex-col gap-3">
+      <section class="flex flex-col gap-3">
         <div v-if="allArticles.loading" class="flex justify-center py-8">
           <Spinner class="h-5 w-5 text-gray-500" />
         </div>
@@ -55,12 +37,6 @@
           {{ __("No articles published yet.") }}
         </div>
       </section>
-
-      <!-- Categories Folder -->
-      <section v-if="activeTab === 'categories'" class="flex flex-col gap-3">
-        <p class="text-lg text-gray-900">{{ __("Categories") }}</p>
-        <CategoryFolderContainer />
-      </section>
     </div>
   </div>
 </template>
@@ -70,14 +46,12 @@ import { ref, onMounted, computed } from "vue";
 import { createResource, Breadcrumbs, Spinner, usePageMeta } from "frappe-ui";
 
 import { LayoutHeader } from "@/components";
-import CategoryFolderContainer from "@/components/knowledge-base/CategoryFolderContainer.vue";
 import ArticleCard from "@/components/knowledge-base/ArticleCard.vue";
 import SearchPopover from "@/components/SearchPopover.vue";
 import { capture } from "@/telemetry";
 import { __ } from "@/translation";
 
 const query = ref("");
-const activeTab = ref<"faq" | "categories">("faq");
 
 const allArticles = createResource({
   url: "helpdesk.api.knowledge_base.get_all_published_articles",
