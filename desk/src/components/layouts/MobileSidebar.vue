@@ -49,7 +49,6 @@
             </div>
           </div>
 
-          <WikiSidebarSection :isExpanded="true" />
           <div v-for="view in allViews" :key="view.label">
             <div
               v-if="!view.hideLabel && view.views?.length"
@@ -76,17 +75,18 @@
                 </div>
               </template>
               <nav class="flex flex-col ml-2 mr-1">
-                <SidebarLink
-                  v-for="link in view.views"
-                  :icon="link.icon"
-                  :label="link.label"
-                  :to="link.to"
-                  :key="link.label"
-                  :is-expanded="true"
-                  :is-active="isActiveTab(link.to)"
-                  class="my-0.5"
-                  :onClick="link.onClick"
-                />
+                <template v-for="link in view.views" :key="link.label">
+                  <SidebarLink
+                    :icon="link.icon"
+                    :label="link.label"
+                    :to="link.to"
+                    :is-expanded="true"
+                    :is-active="isActiveTab(link.to)"
+                    class="my-0.5"
+                    :onClick="link.onClick"
+                  />
+                  <WikiSidebarSection v-if="link.to === 'ContactList'" :isExpanded="true" />
+                </template>
               </nav>
             </Section>
           </div>
