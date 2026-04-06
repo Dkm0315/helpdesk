@@ -1,5 +1,6 @@
 import LucideBriefcase from "~icons/lucide/briefcase";
 import LucideContact2 from "~icons/lucide/contact-2";
+import LucideFileText from "~icons/lucide/file-text";
 import LucideRocket from "~icons/lucide/rocket";
 import LucideShoppingCart from "~icons/lucide/shopping-cart";
 import LucideTicket from "~icons/lucide/ticket";
@@ -39,6 +40,11 @@ export const agentPortalSidebarOptions = [
     to: "OurServicesAgent",
   },
   {
+    label: __("Support Plan"),
+    icon: LucideFileText,
+    to: "SupportPlanAgent",
+  },
+  {
     label: __("Buy Services"),
     icon: LucideShoppingCart,
     to: "BuyServicesAgent",
@@ -60,6 +66,11 @@ export const customerPortalSidebarOptions = [
     label: __("Our Services"),
     icon: LucideBriefcase,
     to: "OurServices",
+  },
+  {
+    label: __("Support Plan"),
+    icon: LucideFileText,
+    to: "SupportPlan",
   },
   {
     label: __("Buy Services"),

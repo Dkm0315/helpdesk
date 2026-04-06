@@ -47,6 +47,13 @@ export const useConfigStore = defineStore("config", () => {
     const val = config.value.enable_wiki;
     return val === undefined || val === null ? true : !!parseInt(val);
   });
+  const enableSupportPlan = computed(() => {
+    const val = config.value.enable_support_plan;
+    if (val === undefined || val === null) return false;
+    if (typeof val === "boolean") return val;
+    if (typeof val === "number") return val === 1;
+    return val === "1" || val.toLowerCase() === "true";
+  });
 
   socket.on("helpdesk:settings-updated", () => configResource.reload());
 
@@ -66,5 +73,6 @@ export const useConfigStore = defineStore("config", () => {
     enableOurServices,
     enableBuyServices,
     enableWiki,
+    enableSupportPlan,
   };
 });

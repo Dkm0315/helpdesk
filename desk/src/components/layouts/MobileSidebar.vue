@@ -127,6 +127,7 @@ import { mobileSidebarOpened as sidebarOpened } from "@/composables/mobile";
 import { currentView, useView } from "@/composables/useView";
 
 import LucideBell from "~icons/lucide/bell";
+import LucideFileText from "~icons/lucide/file-text";
 import LucideLayoutDashboard from "~icons/lucide/layout-dashboard";
 
 import { useAuthStore } from "@/stores/auth";
@@ -139,6 +140,7 @@ import {
 } from "./layoutSettings";
 import { useTelephonyStore } from "@/stores/telephony";
 import { storeToRefs } from "pinia";
+import { __ } from "@/translation";
 const { pinnedViews, publicViews } = useView();
 
 const notificationStore = useNotificationStore();
@@ -155,13 +157,35 @@ const allViews = computed(() => {
     : agentPortalSidebarOptions;
 
   if (!isCallingEnabled.value) {
-    items = items.filter((item) => item.label !== "Call Logs");
+    items = items.filter((item) => item.label !== __("Call Logs"));
   }
   if (!configStore.enableBuyServices) {
-    items = items.filter((item) => item.label !== "Buy Services");
+    items = items.filter((item) => item.label !== __("Buy Services"));
   }
   if (!configStore.enableOurServices) {
-    items = items.filter((item) => item.label !== "Our Services");
+    items = items.filter((item) => item.label !== __("Our Services"));
+  }
+  if (!configStore.enableSupportPlan) {
+    items = items.filter((item) => item.label !== __("Support Plan"));
+  } else if (!items.some((item) => item.label === __("Support Plan"))) {
+    const buyServicesIndex = items.findIndex(
+      (item) => item.label === __("Buy Services")
+    );
+    const supportPlanItem = {
+      label: __("Support Plan"),
+      icon: LucideFileText,
+      to: isCustomerPortal.value ? "SupportPlan" : "SupportPlanAgent",
+    };
+
+    if (buyServicesIndex === -1) {
+      items = [...items, supportPlanItem];
+    } else {
+      items = [
+        ...items.slice(0, buyServicesIndex),
+        supportPlanItem,
+        ...items.slice(buyServicesIndex),
+      ];
+    }
   }
 
   const options = [

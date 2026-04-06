@@ -8,6 +8,7 @@ from helpdesk.consts import DEFAULT_ARTICLE_CATEGORY
 
 from .default_template import create_default_template
 from .file import create_helpdesk_folder
+from .support_plan import ensure_support_plan
 from .ticket_feedback import create_ticket_feedback_options
 from .ticket_type import create_fallback_ticket_type, create_ootb_ticket_types
 from .welcome_ticket import create_welcome_ticket
@@ -33,6 +34,7 @@ def after_install():
     add_website_settings_permission()
     add_email_template_perms_for_agent_and_agent_manager()
     set_default_our_services_content()
+    ensure_support_plan()
     setup_oss_manager_wiki()
     # Always keep this at last, because sql_ddl makes the db commit
     add_fts_index()

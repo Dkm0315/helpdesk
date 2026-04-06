@@ -267,6 +267,28 @@ const allViews = computed(() => {
   if (!configStore.enableOurServices) {
     items = items.filter((item) => item.label !== __("Our Services"));
   }
+  if (!configStore.enableSupportPlan) {
+    items = items.filter((item) => item.label !== __("Support Plan"));
+  } else if (!items.some((item) => item.label === __("Support Plan"))) {
+    const buyServicesIndex = items.findIndex(
+      (item) => item.label === __("Buy Services")
+    );
+    const supportPlanItem = {
+      label: __("Support Plan"),
+      icon: FileText,
+      to: isCustomerPortal.value ? "SupportPlan" : "SupportPlanAgent",
+    };
+
+    if (buyServicesIndex === -1) {
+      items = [...items, supportPlanItem];
+    } else {
+      items = [
+        ...items.slice(0, buyServicesIndex),
+        supportPlanItem,
+        ...items.slice(buyServicesIndex),
+      ];
+    }
+  }
 
   const options = [
     {

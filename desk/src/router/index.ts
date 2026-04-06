@@ -130,6 +130,11 @@ const routes = [
     name: "OurServicesAgent",
     component: () => import("@/pages/our-services/OurServicesLanding.vue"),
   },
+  {
+    path: "/agent/support-plan",
+    name: "SupportPlanAgent",
+    component: () => import("@/pages/support-plan/SupportPlan.vue"),
+  },
 
   // Customer Portal Routes
   {
@@ -219,6 +224,15 @@ const routes = [
     path: "/our-services",
     name: "OurServices",
     component: () => import("@/pages/our-services/OurServicesLanding.vue"),
+    meta: {
+      public: true,
+      auth: true,
+    },
+  },
+  {
+    path: "/support-plan",
+    name: "SupportPlan",
+    component: () => import("@/pages/support-plan/SupportPlan.vue"),
     meta: {
       public: true,
       auth: true,

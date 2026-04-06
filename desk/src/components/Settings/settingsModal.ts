@@ -30,6 +30,8 @@ import OurServicesSettings from "./OurServices/OurServicesSettings.vue";
 import WikiSettings from "./Wiki/WikiSettings.vue";
 import LucideBookOpen from "~icons/lucide/book-open";
 import LucideWrench from "~icons/lucide/wrench";
+import LucideFileText from "~icons/lucide/file-text";
+import SupportPlanSettings from "./SupportPlan/SupportPlanSettings.vue";
 
 export const showSettingsModal = ref(false);
 
@@ -142,6 +144,12 @@ export const tabs = computed(() => {
           component: markRaw(WikiSettings),
           condition: () => auth.isAdmin,
         },
+        {
+          label: __("Support Plan"),
+          icon: markRaw(LucideFileText),
+          component: markRaw(SupportPlanSettings),
+          condition: () => auth.isAdmin,
+        },
       ],
     },
     {
@@ -189,7 +197,8 @@ type TabName =
   | "Telephony"
   | "Saved Replies"
   | "Our Services"
-  | "Wiki Pages";
+  | "Wiki Pages"
+  | "Support Plan";
 
 export const setActiveSettingsTab = (tabName: TabName) => {
   activeTab.value =

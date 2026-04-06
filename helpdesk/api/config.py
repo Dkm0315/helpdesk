@@ -21,6 +21,12 @@ def get_config():
     ]
     settings = frappe.get_single("HD Settings")
     res = frappe._dict({f: getattr(settings, f, None) for f in fields})
+    if frappe.db.exists("DocType", "HD Support Plan"):
+        res.enable_support_plan = bool(
+            frappe.db.get_single_value("HD Support Plan", "enabled")
+        )
+    else:
+        res.enable_support_plan = False
 
     res.favicon = (
         res.favicon
