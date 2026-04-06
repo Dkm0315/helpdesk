@@ -40,7 +40,7 @@ export const agentPortalSidebarOptions = [
     to: "OurServicesAgent",
   },
   {
-    label: __("Support Plan"),
+    label: __("OSS Manager and OSS Connector - Support Plans"),
     icon: LucideFileText,
     to: "SupportPlanAgent",
   },
@@ -68,7 +68,7 @@ export const customerPortalSidebarOptions = [
     to: "OurServices",
   },
   {
-    label: __("Support Plan"),
+    label: __("OSS Manager and OSS Connector - Support Plans"),
     icon: LucideFileText,
     to: "SupportPlan",
   },

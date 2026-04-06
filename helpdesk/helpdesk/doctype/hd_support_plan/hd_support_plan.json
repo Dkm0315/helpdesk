@@ -12,7 +12,7 @@
  ],
  "fields": [
   {
-   "default": "Support Plan",
+   "default": "OSS Manager and OSS Connector - Support Plans",
    "fieldname": "title",
    "fieldtype": "Data",
    "label": "Title",

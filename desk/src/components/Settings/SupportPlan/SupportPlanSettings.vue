@@ -1,13 +1,13 @@
 <template>
   <SettingsLayoutBase
     :description="__(
-      'Manage the editable Support Plan page shown in the sidebar.'
+      'Manage the editable OSS Manager and OSS Connector support plans page shown in the sidebar.'
     )"
   >
     <template #title>
       <div class="flex items-center gap-2">
         <h1 class="text-lg font-semibold text-ink-gray-8">
-          {{ __("Support Plan") }}
+          {{ __("OSS Manager and OSS Connector - Support Plans") }}
         </h1>
         <Badge
           v-if="isDirty"
@@ -55,7 +55,7 @@
           size="sm"
           variant="subtle"
           :label="__('Title')"
-          :placeholder="__('Support Plan')"
+          :placeholder="__('OSS Manager and OSS Connector - Support Plans')"
           v-model="formData.title"
           :disabled="!isEditing"
           required
@@ -142,7 +142,8 @@ const supportPlanResource = createResource({
   auto: true,
   onSuccess(data: any) {
     formData.value = {
-      title: data.title || __("Support Plan"),
+      title:
+        data.title || __("OSS Manager and OSS Connector - Support Plans"),
       content: data.content || "",
       enabled: Boolean(data.enabled),
     };
@@ -165,13 +166,16 @@ const saveResource = createResource({
   },
   onSuccess(data: any) {
     formData.value = {
-      title: data.title || __("Support Plan"),
+      title:
+        data.title || __("OSS Manager and OSS Connector - Support Plans"),
       content: data.content || "",
       enabled: Boolean(data.enabled),
     };
     initialData.value = JSON.stringify(formData.value);
     isEditing.value = false;
-    toast.success(__("Support Plan updated"));
+    toast.success(
+      __("OSS Manager and OSS Connector support plans updated")
+    );
   },
 });
 

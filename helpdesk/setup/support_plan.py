@@ -1,7 +1,7 @@
 import frappe
 
 
-DEFAULT_SUPPORT_PLAN_TITLE = "Support Plan"
+DEFAULT_SUPPORT_PLAN_TITLE = "OSS Manager and OSS Connector - Support Plans"
 
 DEFAULT_SUPPORT_PLAN_CONTENT = """
 <table>

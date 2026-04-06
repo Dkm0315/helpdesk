@@ -16,7 +16,7 @@
     >
       <div class="mb-4">
         <h1 class="text-2xl font-semibold text-ink-gray-9">
-          {{ pageContent.data.title || __("Support Plan") }}
+          {{ pageContent.data.title || __("OSS Manager and OSS Connector - Support Plans") }}
         </h1>
       </div>
       <div class="support-plan-content prose prose-sm max-w-none" v-html="pageContent.data.content" />
@@ -45,7 +45,7 @@ const pageContent = createResource({
 
 const breadcrumbs = computed(() => [
   {
-    label: __("Support Plan"),
+    label: __("OSS Manager and OSS Connector - Support Plans"),
     route: {
       name: isCustomerPortal.value ? "SupportPlan" : "SupportPlanAgent",
     },
@@ -53,7 +53,7 @@ const breadcrumbs = computed(() => [
 ]);
 
 usePageMeta(() => ({
-  title: __("Support Plan"),
+  title: __("OSS Manager and OSS Connector - Support Plans"),
 }));
 </script>
 

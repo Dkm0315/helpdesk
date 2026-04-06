@@ -145,7 +145,7 @@ export const tabs = computed(() => {
           condition: () => auth.isAdmin,
         },
         {
-          label: __("Support Plan"),
+          label: __("OSS Manager and OSS Connector - Support Plans"),
           icon: markRaw(LucideFileText),
           component: markRaw(SupportPlanSettings),
           condition: () => auth.isAdmin,
@@ -198,7 +198,7 @@ type TabName =
   | "Saved Replies"
   | "Our Services"
   | "Wiki Pages"
-  | "Support Plan";
+  | "OSS Manager and OSS Connector - Support Plans";
 
 export const setActiveSettingsTab = (tabName: TabName) => {
   activeTab.value =

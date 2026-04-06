@@ -268,13 +268,21 @@ const allViews = computed(() => {
     items = items.filter((item) => item.label !== __("Our Services"));
   }
   if (!configStore.enableSupportPlan) {
-    items = items.filter((item) => item.label !== __("Support Plan"));
-  } else if (!items.some((item) => item.label === __("Support Plan"))) {
+    items = items.filter(
+      (item) =>
+        item.label !== __("OSS Manager and OSS Connector - Support Plans")
+    );
+  } else if (
+    !items.some(
+      (item) =>
+        item.label === __("OSS Manager and OSS Connector - Support Plans")
+    )
+  ) {
     const buyServicesIndex = items.findIndex(
       (item) => item.label === __("Buy Services")
     );
     const supportPlanItem = {
-      label: __("Support Plan"),
+      label: __("OSS Manager and OSS Connector - Support Plans"),
       icon: FileText,
       to: isCustomerPortal.value ? "SupportPlan" : "SupportPlanAgent",
     };

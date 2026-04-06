@@ -6,7 +6,7 @@ def get_support_plan_content():
     support_plan = frappe.get_single("HD Support Plan")
 
     return {
-        "title": support_plan.title or "Support Plan",
+        "title": support_plan.title or "OSS Manager and OSS Connector - Support Plans",
         "content": support_plan.content or "",
         "enabled": bool(support_plan.enabled),
     }
