@@ -1,0 +1,76 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - button "Helpdesk Administrator" [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Helpdesk
+          - generic [ref=e11]: Administrator
+        - img [ref=e13]
+      - generic [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]:
+          - text: Search
+          - generic [ref=e21]:
+            - img [ref=e22]
+            - generic [ref=e24]: K
+      - generic [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e32]: Dashboard
+      - generic [ref=e34] [cursor=pointer]:
+        - img [ref=e36]
+        - generic [ref=e39]: Notifications
+      - navigation [ref=e44]:
+        - generic [ref=e45] [cursor=pointer]:
+          - img [ref=e47]
+          - generic [ref=e49]: Tickets
+        - generic [ref=e50] [cursor=pointer]:
+          - img [ref=e52]
+          - generic [ref=e57]: Get Started
+        - generic [ref=e58] [cursor=pointer]:
+          - img [ref=e60]
+          - generic [ref=e62]: Customers
+        - generic [ref=e63] [cursor=pointer]:
+          - img [ref=e65]
+          - generic [ref=e69]: Contacts
+        - generic [ref=e71] [cursor=pointer]:
+          - img [ref=e73]
+          - generic [ref=e75]:
+            - text: Documentation
+            - img [ref=e76]
+        - generic [ref=e78] [cursor=pointer]:
+          - img [ref=e80]
+          - generic [ref=e83]: Our Services
+        - generic [ref=e84] [cursor=pointer]:
+          - img [ref=e86]
+          - generic [ref=e90]: Buy Services
+      - generic [ref=e92]:
+        - generic [ref=e93] [cursor=pointer]:
+          - img [ref=e95]
+          - generic [ref=e97]: Help
+        - generic [ref=e98] [cursor=pointer]:
+          - img [ref=e100]
+          - generic [ref=e102]: Collapse
+    - generic [ref=e103]:
+      - banner [ref=e106]:
+        - generic [ref=e108]:
+          - link "Tickets" [ref=e109] [cursor=pointer]:
+            - /url: /helpdesk/tickets
+          - generic [ref=e110]: /
+          - button "List" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e113]: List
+            - img [ref=e114]
+        - link "Create" [ref=e117] [cursor=pointer]:
+          - /url: /helpdesk/tickets/new
+          - button "Create" [ref=e118]:
+            - img [ref=e119]
+            - generic [ref=e120]: Create
+      - generic [ref=e123]:
+        - img [ref=e124]
+        - generic [ref=e126]: No Tickets Found
+        - button "Create" [ref=e127] [cursor=pointer]:
+          - img [ref=e128]
+          - generic [ref=e129]: Create
+  - region "Notifications (F8)":
+    - list

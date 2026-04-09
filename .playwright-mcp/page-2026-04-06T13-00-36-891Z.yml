@@ -1,0 +1,168 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - button "Helpdesk Administrator" [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Helpdesk
+          - generic [ref=e11]: Administrator
+        - img [ref=e13]
+      - generic [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]:
+          - text: Search
+          - generic [ref=e21]:
+            - img [ref=e22]
+            - generic [ref=e24]: K
+      - generic [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e32]: Dashboard
+      - generic [ref=e34] [cursor=pointer]:
+        - img [ref=e36]
+        - generic [ref=e39]: Notifications
+      - navigation [ref=e44]:
+        - generic [ref=e45] [cursor=pointer]:
+          - img [ref=e47]
+          - generic [ref=e49]: Tickets
+        - generic [ref=e50] [cursor=pointer]:
+          - img [ref=e52]
+          - generic [ref=e57]: Get Started
+        - generic [ref=e58] [cursor=pointer]:
+          - img [ref=e60]
+          - generic [ref=e62]: Customers
+        - generic [ref=e63] [cursor=pointer]:
+          - img [ref=e65]
+          - generic [ref=e69]: Contacts
+        - generic [ref=e71] [cursor=pointer]:
+          - img [ref=e73]
+          - generic [ref=e75]:
+            - text: Documentation
+            - img [ref=e76]
+        - generic [ref=e78] [cursor=pointer]:
+          - img [ref=e80]
+          - generic [ref=e83]: Our Services
+        - generic [ref=e84] [cursor=pointer]:
+          - img [ref=e86]
+          - generic [ref=e90]: Buy Services
+      - generic [ref=e92]:
+        - generic [ref=e93] [cursor=pointer]:
+          - img [ref=e95]
+          - generic [ref=e97]: Help
+        - generic [ref=e98] [cursor=pointer]:
+          - img [ref=e100]
+          - generic [ref=e102]: Collapse
+    - generic [ref=e103]:
+      - banner [ref=e106]:
+        - generic [ref=e108]:
+          - link "Tickets" [ref=e109] [cursor=pointer]:
+            - /url: /helpdesk/tickets
+          - generic [ref=e110]: /
+          - button "List" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e113]: List
+            - img [ref=e114]
+        - link "Create" [ref=e117] [cursor=pointer]:
+          - /url: /helpdesk/tickets/new
+          - button "Create" [ref=e118]:
+            - img [ref=e119]
+            - generic [ref=e120]: Create
+      - generic [ref=e121]:
+        - generic [ref=e130]:
+          - generic [ref=e132]:
+            - textbox "ID" [ref=e135]
+            - textbox "Subject" [ref=e138]
+            - button "Customer" [ref=e143] [cursor=pointer]:
+              - generic [ref=e145]: Customer
+              - img [ref=e146]
+          - generic [ref=e148]:
+            - button "Refresh" [ref=e149] [cursor=pointer]:
+              - img [ref=e150]
+            - button "Filter" [ref=e155] [cursor=pointer]:
+              - img [ref=e156]
+              - generic [ref=e157]: Filter
+            - generic [ref=e160]:
+              - button [ref=e161] [cursor=pointer]:
+                - img [ref=e163]
+              - button "Last Modified" [ref=e167] [cursor=pointer]:
+                - generic [ref=e168]: Last Modified
+                - img [ref=e169]
+            - button "Columns" [ref=e173] [cursor=pointer]:
+              - img [ref=e174]
+              - generic [ref=e176]: Columns
+        - generic [ref=e178]:
+          - generic [ref=e179]:
+            - checkbox [ref=e181] [cursor=pointer]
+            - generic [ref=e184]: ID
+            - generic [ref=e187]: Subject
+            - generic [ref=e190]: Status
+            - generic [ref=e193]: First response
+            - generic [ref=e196]: Resolution
+            - generic [ref=e199]: Assigned To
+            - generic [ref=e202]: Customer
+            - generic [ref=e205]: Priority
+            - generic [ref=e208]: Type
+            - generic [ref=e211]: Team
+            - generic [ref=e214]: Contact
+            - generic [ref=e217]: Rating
+            - generic [ref=e220]: Created
+          - generic [ref=e221]:
+            - link [ref=e222] [cursor=pointer]:
+              - /url: /helpdesk/tickets/3
+              - generic [ref=e224]:
+                - checkbox [ref=e227]
+                - generic [ref=e230]: "3"
+                - generic [ref=e233]: Smoke Test External Ticket
+                - generic [ref=e236]:
+                  - img [ref=e237]
+                  - generic [ref=e239]: Open
+                - generic [ref=e242]: Failed
+                - generic [ref=e244]: 7 hours ago
+                - generic [ref=e247]: Medium
+                - generic [ref=e250]: Unspecified
+                - generic [ref=e253]: Smoke Test User
+                - generic [ref=e256]:
+                  - img [ref=e257]
+                  - img [ref=e259]
+                  - img [ref=e261]
+                  - img [ref=e263]
+                  - img [ref=e265]
+                - generic [ref=e269]: 5 d
+            - link [ref=e271] [cursor=pointer]:
+              - /url: /helpdesk/tickets/1
+              - generic [ref=e273]:
+                - checkbox [ref=e276]
+                - generic [ref=e279]: "1"
+                - generic [ref=e282]: Welcome to Helpdesk
+                - generic [ref=e285]:
+                  - img [ref=e286]
+                  - generic [ref=e288]: Open
+                - generic [ref=e291]: Failed
+                - generic [ref=e293]: 20 days ago
+                - generic [ref=e299]: A
+                - generic [ref=e302]: Medium
+                - generic [ref=e305]: Unspecified
+                - generic [ref=e308]: John Doe
+                - generic [ref=e311]:
+                  - img [ref=e312]
+                  - img [ref=e314]
+                  - img [ref=e316]
+                  - img [ref=e318]
+                  - img [ref=e320]
+                - generic [ref=e324]: 3 w
+        - generic [ref=e326]:
+          - radiogroup [ref=e327]:
+            - radio "20" [checked] [ref=e328]:
+              - button "20" [ref=e329] [cursor=pointer]:
+                - generic [ref=e331]: "20"
+            - radio "50" [ref=e332]:
+              - button "50" [ref=e333] [cursor=pointer]:
+                - generic [ref=e335]: "50"
+            - radio "100" [ref=e336]:
+              - button "100" [ref=e337] [cursor=pointer]:
+                - generic [ref=e339]: "100"
+          - generic [ref=e341]:
+            - generic [ref=e342]: "2"
+            - generic [ref=e343]: of
+            - generic [ref=e344]: "2"
+  - region "Notifications (F8)":
+    - list

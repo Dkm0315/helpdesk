@@ -326,7 +326,12 @@ class HDTicket(Document):
         )
 
     def check_update_perms(self):
-        if self.is_new() or is_agent() or not self.via_customer_portal:
+        if (
+            self.is_new()
+            or is_agent()
+            or not self.via_customer_portal
+            or getattr(self.flags, "allow_customer_portal_reopen", False)
+        ):
             return
         old_doc = self.get_doc_before_save()
         is_closed = old_doc.status == "Closed"
@@ -708,6 +713,19 @@ class HDTicket(Document):
         )
         for url in file_urls:
             self.attach_file_with_doc("HD Ticket", self.name, url)
+
+    @frappe.whitelist()
+    def reopen_via_customer_portal(self):
+        frappe.has_permission("HD Ticket", "read", self.name, throw=True)
+
+        if self.status != "Closed":
+            frappe.throw(_("Only closed tickets can be reopened."))
+
+        self.flags.allow_customer_portal_reopen = True
+        self.status = self.ticket_reopen_status
+        self.save(ignore_permissions=True)
+
+        return {"status": self.status}
 
     def handle_inline_media_new_ticket(self):
         soup = BeautifulSoup(self.description, "html.parser")

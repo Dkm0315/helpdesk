@@ -633,7 +633,82 @@ class TestHDTicket(FrappeTestCase):
             ticket2_doc.name,
         )
 
+    def test_customer_can_reopen_closed_ticket(self):
+        ticket = make_ticket(raised_by=non_agent, via_customer_portal=1)
+        ticket.status = "Closed"
+        ticket.save()
+
+        frappe.set_user(non_agent)
+        try:
+            ticket = frappe.get_doc("HD Ticket", ticket.name)
+            response = ticket.reopen_via_customer_portal()
+            ticket.reload()
+        finally:
+            frappe.set_user("Administrator")
+
+        self.assertEqual(ticket.status, ticket.ticket_reopen_status)
+        self.assertEqual(response["status"], ticket.ticket_reopen_status)
+
+    def test_customer_can_reopen_closed_ticket_with_feedback(self):
+        feedback = frappe.get_all(
+            "HD Ticket Feedback Option",
+            filters={"disabled": 0},
+            pluck="name",
+            limit=1,
+        )[0]
+
+        ticket = make_ticket(raised_by=non_agent, via_customer_portal=1)
+        ticket.status = "Closed"
+        ticket.feedback = feedback
+        ticket.feedback_extra = "Resolved after checking"
+        ticket.save()
+
+        frappe.set_user(non_agent)
+        try:
+            ticket = frappe.get_doc("HD Ticket", ticket.name)
+            ticket.reopen_via_customer_portal()
+            ticket.reload()
+        finally:
+            frappe.set_user("Administrator")
+
+        self.assertEqual(ticket.status, ticket.ticket_reopen_status)
+        self.assertEqual(ticket.feedback, feedback)
+
+    def test_non_reopen_updates_to_closed_rated_tickets_stay_blocked(self):
+        feedback = frappe.get_all(
+            "HD Ticket Feedback Option",
+            filters={"disabled": 0},
+            pluck="name",
+            limit=1,
+        )[0]
+
+        ticket = make_ticket(raised_by=non_agent, via_customer_portal=1)
+        ticket.status = "Closed"
+        ticket.feedback = feedback
+        ticket.save()
+
+        frappe.set_user(non_agent)
+        try:
+            ticket = frappe.get_doc("HD Ticket", ticket.name)
+            ticket.subject = "Updated by customer"
+            with self.assertRaises(frappe.PermissionError):
+                ticket.save()
+        finally:
+            frappe.set_user("Administrator")
+
+    def test_customer_reopen_requires_closed_status(self):
+        ticket = make_ticket(raised_by=non_agent, via_customer_portal=1)
+
+        frappe.set_user(non_agent)
+        try:
+            ticket = frappe.get_doc("HD Ticket", ticket.name)
+            with self.assertRaises(frappe.ValidationError):
+                ticket.reopen_via_customer_portal()
+        finally:
+            frappe.set_user("Administrator")
+
     def tearDown(self):
+        frappe.set_user("Administrator")
         remove_holidays()
         frappe.db.set_single_value("HD Settings", "default_ticket_status", "Open")
         frappe.delete_doc("HD Ticket Status", "New", force=True)

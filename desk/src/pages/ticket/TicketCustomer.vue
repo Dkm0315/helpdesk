@@ -20,6 +20,15 @@
             <LucideCheck class="size-4" />
           </template>
         </Button>
+        <Button
+          v-else
+          :label="__('Re-open')"
+          theme="gray"
+          variant="subtle"
+          size="sm"
+          :loading="reopen.loading"
+          @click="handleReopen"
+        />
       </template>
     </LayoutHeader>
     <div class="flex overflow-hidden h-full w-full">
@@ -250,6 +259,20 @@ const send = createResource({
   },
 });
 
+const reopen = createResource({
+  url: "run_doc_method",
+  debounce: 300,
+  makeParams: () => ({
+    dt: "HD Ticket",
+    dn: props.ticketId,
+    method: "reopen_via_customer_portal",
+  }),
+  onSuccess: () => {
+    ticket.reload();
+    toast.success(__("Ticket reopened"));
+  },
+});
+
 function updateField(name, value, callback = () => {}) {
   updateTicket(name, value);
   callback();
@@ -285,6 +308,13 @@ function handleClose() {
   } else {
     showConfirmationDialog();
   }
+}
+
+function handleReopen() {
+  if (reopen.loading) {
+    return;
+  }
+  reopen.submit();
 }
 
 function showConfirmationDialog() {

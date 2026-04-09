@@ -1,0 +1,180 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - button "Helpdesk Administrator" [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Helpdesk
+          - generic [ref=e11]: Administrator
+        - img [ref=e13]
+      - generic [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]:
+          - text: Search
+          - generic [ref=e21]:
+            - img [ref=e22]
+            - generic [ref=e24]: K
+      - generic [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e32]: Dashboard
+      - generic [ref=e34] [cursor=pointer]:
+        - img [ref=e36]
+        - generic [ref=e39]: Notifications
+      - navigation [ref=e44]:
+        - generic [ref=e45] [cursor=pointer]:
+          - img [ref=e47]
+          - generic [ref=e49]: Tickets
+        - generic [ref=e50] [cursor=pointer]:
+          - img [ref=e52]
+          - generic [ref=e57]: Get Started
+        - generic [ref=e58] [cursor=pointer]:
+          - img [ref=e60]
+          - generic [ref=e62]: Customers
+        - generic [ref=e63] [cursor=pointer]:
+          - img [ref=e65]
+          - generic [ref=e69]: Contacts
+        - generic [ref=e71] [cursor=pointer]:
+          - img [ref=e73]
+          - generic [ref=e75]:
+            - text: Documentation
+            - img [ref=e76]
+        - generic [ref=e78] [cursor=pointer]:
+          - img [ref=e80]
+          - generic [ref=e83]: Our Services
+        - generic [ref=e84] [cursor=pointer]:
+          - img [ref=e86]
+          - generic [ref=e89]: OSS Manager and OSS Connector - Support Plans
+        - generic [ref=e90] [cursor=pointer]:
+          - img [ref=e92]
+          - generic [ref=e96]: Buy Services
+      - generic [ref=e98]:
+        - generic [ref=e99] [cursor=pointer]:
+          - img [ref=e101]
+          - generic [ref=e103]: Help
+        - generic [ref=e104] [cursor=pointer]:
+          - img [ref=e106]
+          - generic [ref=e108]: Collapse
+    - generic [ref=e109]:
+      - banner [ref=e343]:
+        - link "OSS Manager and OSS Connector - Support Plans" [ref=e347] [cursor=pointer]:
+          - /url: /helpdesk/agent/support-plan
+          - generic [ref=e348]: OSS Manager and OSS Connector - Support Plans
+      - generic [ref=e350]:
+        - heading "OSS Manager and OSS Connector - Support Plans" [level=1] [ref=e352]
+        - table [ref=e354]:
+          - rowgroup [ref=e355]:
+            - row "Feature / Service Area Basic Support Enterprise Support" [ref=e356]:
+              - columnheader "Feature / Service Area" [ref=e357]
+              - columnheader "Basic Support" [ref=e358]
+              - columnheader "Enterprise Support" [ref=e359]
+          - rowgroup [ref=e360]:
+            - row "Support Coverage Standard operational support for day-to-day issues and platform guidance Premium support with faster response times, advanced troubleshooting, and continuous coverage" [ref=e361]:
+              - cell "Support Coverage" [ref=e362]
+              - cell "Standard operational support for day-to-day issues and platform guidance" [ref=e363]
+              - cell "Premium support with faster response times, advanced troubleshooting, and continuous coverage" [ref=e364]
+            - row "P1 Incident Response 8 business hours 1 hour" [ref=e365]:
+              - cell "P1 Incident Response" [ref=e366]
+              - cell "8 business hours" [ref=e367]
+              - cell "1 hour" [ref=e368]
+            - row "P2 Incident Response 16 business hours 4 hours" [ref=e369]:
+              - cell "P2 Incident Response" [ref=e370]
+              - cell "16 business hours" [ref=e371]
+              - cell "4 hours" [ref=e372]
+            - row "P3 / General Query Response Next business day Within 8 business hours" [ref=e373]:
+              - cell "P3 / General Query Response" [ref=e374]
+              - cell "Next business day" [ref=e375]
+              - cell "Within 8 business hours" [ref=e376]
+            - row "Technical Support Availability Business hours only 24x7 coverage including weekends and holidays" [ref=e377]:
+              - cell "Technical Support Availability" [ref=e378]
+              - cell "Business hours only" [ref=e379]
+              - cell "24x7 coverage including weekends and holidays" [ref=e380]
+            - row "Working Model Remote support only Remote support only" [ref=e381]:
+              - cell "Working Model" [ref=e382]
+              - cell "Remote support only" [ref=e383]
+              - cell "Remote support only" [ref=e384]
+            - row "Support Portal Access Included Included" [ref=e385]:
+              - cell "Support Portal Access" [ref=e386]
+              - cell "Included" [ref=e387]
+              - cell "Included" [ref=e388]
+            - row "Ticket-Based Support Included via support portal Included via support portal" [ref=e389]:
+              - cell "Ticket-Based Support" [ref=e390]
+              - cell "Included via support portal" [ref=e391]
+              - cell "Included via support portal" [ref=e392]
+            - row "Email Support Included Included" [ref=e393]:
+              - cell "Email Support" [ref=e394]
+              - cell "Included" [ref=e395]
+              - cell "Included" [ref=e396]
+            - row "Monitoring Guidance Included Included" [ref=e397]:
+              - cell "Monitoring Guidance" [ref=e398]
+              - cell "Included" [ref=e399]
+              - cell "Included" [ref=e400]
+            - row "Incident Troubleshooting Included Included with priority handling" [ref=e401]:
+              - cell "Incident Troubleshooting" [ref=e402]
+              - cell "Included" [ref=e403]
+              - cell "Included with priority handling" [ref=e404]
+            - row "Root Cause Analysis (RCA) Not included Included for major incidents and repeated failures" [ref=e405]:
+              - cell "Root Cause Analysis (RCA)" [ref=e406]
+              - cell "Not included" [ref=e407]
+              - cell "Included for major incidents and repeated failures" [ref=e408]
+            - row "Escalation Management Standard escalation process Priority escalation with faster turnaround" [ref=e409]:
+              - cell "Escalation Management" [ref=e410]
+              - cell "Standard escalation process" [ref=e411]
+              - cell "Priority escalation with faster turnaround" [ref=e412]
+            - row "Configuration Review Basic, For expert guidance contact Professional services Basic, For expert guidance contact Professional services" [ref=e413]:
+              - cell "Configuration Review" [ref=e414]
+              - cell "Basic, For expert guidance contact Professional services" [ref=e415]
+              - cell "Basic, For expert guidance contact Professional services" [ref=e416]
+            - row "Upgrade Advisory Basic, For expert guidance contact Professional services Basic, For expert guidance contact Professional services" [ref=e417]:
+              - cell "Upgrade Advisory" [ref=e418]
+              - cell "Basic, For expert guidance contact Professional services" [ref=e419]
+              - cell "Basic, For expert guidance contact Professional services" [ref=e420]
+            - row "Performance Tuning Recommendations Basic, For expert guidance contact Professional services Basic, For expert guidance contact Professional services" [ref=e421]:
+              - cell "Performance Tuning Recommendations" [ref=e422]
+              - cell "Basic, For expert guidance contact Professional services" [ref=e423]
+              - cell "Basic, For expert guidance contact Professional services" [ref=e424]
+            - row "Architecture Advisory Contact Solution Consultant Teams Contact Solution Consultant Teams" [ref=e425]:
+              - cell "Architecture Advisory" [ref=e426]
+              - cell "Contact Solution Consultant Teams" [ref=e427]
+              - cell "Contact Solution Consultant Teams" [ref=e428]
+            - row "Professional Services Available at additional cost Available at additional cost" [ref=e429]:
+              - cell "Professional Services" [ref=e430]
+              - cell "Available at additional cost" [ref=e431]
+              - cell "Available at additional cost" [ref=e432]
+            - row "Dedicated L1 Resource Available at additional cost Available at additional cost" [ref=e433]:
+              - cell "Dedicated L1 Resource" [ref=e434]
+              - cell "Available at additional cost" [ref=e435]
+              - cell "Available at additional cost" [ref=e436]
+            - row "Dedicated L2 / Technical Expert Not included Available at additional cost" [ref=e437]:
+              - cell "Dedicated L2 / Technical Expert" [ref=e438]
+              - cell "Not included" [ref=e439]
+              - cell "Available at additional cost" [ref=e440]
+            - row "Solution Consultancy / Architect Support Available at additional cost Available at additional cost" [ref=e441]:
+              - cell "Solution Consultancy / Architect Support" [ref=e442]
+              - cell "Available at additional cost" [ref=e443]
+              - cell "Available at additional cost" [ref=e444]
+            - row "Training & Knowledge Transfer Not included Available as optional service" [ref=e445]:
+              - cell "Training & Knowledge Transfer" [ref=e446]
+              - cell "Not included" [ref=e447]
+              - cell "Available as optional service" [ref=e448]
+            - row "New OSS Manager Releases Included Included" [ref=e449]:
+              - cell "New OSS Manager Releases" [ref=e450]
+              - cell "Included" [ref=e451]
+              - cell "Included" [ref=e452]
+            - row "Product Documentation Access Included Included" [ref=e453]:
+              - cell "Product Documentation Access" [ref=e454]
+              - cell "Included" [ref=e455]
+              - cell "Included" [ref=e456]
+            - row "Best Practices & Runbooks Included Included" [ref=e457]:
+              - cell "Best Practices & Runbooks" [ref=e458]
+              - cell "Included" [ref=e459]
+              - cell "Included" [ref=e460]
+            - row "Support Channels Portal and Email Portal and Email" [ref=e461]:
+              - cell "Support Channels" [ref=e462]
+              - cell "Portal and Email" [ref=e463]
+              - cell "Portal and Email" [ref=e464]
+            - row "Intended Customers Smaller teams with internal technical capability and standard business-hour needs Enterprises requiring faster response, 24/7 coverage, RCA, and critical issue handling" [ref=e465]:
+              - cell "Intended Customers" [ref=e466]
+              - cell "Smaller teams with internal technical capability and standard business-hour needs" [ref=e467]
+              - cell "Enterprises requiring faster response, 24/7 coverage, RCA, and critical issue handling" [ref=e468]
+  - region "Notifications (F8)":
+    - list
