@@ -23,7 +23,7 @@
             {{ timeAgo(creation) }}
           </span>
         </Tooltip>
-        <div v-if="authStore.userId === commentedBy && !editable">
+        <div v-if="authStore.isAgent && authStore.userId === commentedBy && !editable">
           <Dropdown
             :placement="'right'"
             :options="[

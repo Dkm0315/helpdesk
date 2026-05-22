@@ -29,6 +29,7 @@
           />
         </div>
         <TicketCommunication
+          v-if="c.type === 'email'"
           :content="c.content"
           :date="c.creation"
           :user="c.user"
@@ -36,6 +37,11 @@
           :cc="c.cc || ''"
           :bcc="c.bcc || ''"
           :attachments="c.attachments"
+        />
+        <CommentBox
+          v-else-if="c.type === 'comment'"
+          :activity="c"
+          @update="ticket.reload()"
         />
       </div>
     </div>
@@ -45,10 +51,14 @@
 <script setup lang="ts">
 import { isElementInViewport } from "@/utils";
 import { Avatar } from "frappe-ui";
-import { computed, inject, nextTick, watch } from "vue";
+import { computed, defineAsyncComponent, inject, nextTick, watch } from "vue";
 import { useRoute } from "vue-router";
 import TicketCommunication from "./TicketCommunication.vue";
 import { ITicket } from "./symbols";
+
+const CommentBox = defineAsyncComponent(
+  () => import("@/components/CommentBox.vue")
+);
 
 interface P {
   focus?: string;
@@ -60,8 +70,23 @@ const props = withDefaults(defineProps<P>(), {
 const route = useRoute();
 const ticket = inject(ITicket);
 const communications = computed(() => {
-  const _communications = ticket.data.communications || [];
-  return _communications.sort(
+  const _communications = (ticket.data.communications || []).map((email) => ({
+    ...email,
+    type: "email",
+    key: email.creation,
+  }));
+  const _comments = (ticket.data.comments || []).map((comment) => ({
+    name: comment.name,
+    type: "comment",
+    key: comment.creation,
+    commentedBy: comment.commented_by,
+    commenter: comment.user.name,
+    creation: comment.creation,
+    content: comment.content,
+    attachments: comment.attachments,
+    user: comment.user,
+  }));
+  return [..._communications, ..._comments].sort(
     (a, b) => new Date(a.creation) - new Date(b.creation)
   );
 });

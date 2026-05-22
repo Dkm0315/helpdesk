@@ -534,16 +534,21 @@ class HDTicket(Document):
 
     @frappe.whitelist()
     def new_comment(self, content: str, attachments: list[str] = []):
-        if not is_agent():
+        if not is_agent() and not frappe.has_permission(
+            "HD Ticket", "read", self.name
+        ):
             frappe.throw(
                 _("You are not permitted to add a comment"), frappe.PermissionError
             )
+        if not is_agent() and self.status == "Closed":
+            frappe.throw(_("Closed tickets cannot be commented on."))
+
         c = frappe.new_doc("HD Ticket Comment")
         c.commented_by = frappe.session.user
         c.content = content
         c.is_pinned = False
         c.reference_ticket = self.name
-        c.save()
+        c.save(ignore_permissions=True)
         for attachment in attachments:
             self.attach_file_with_doc(
                 "HD Ticket Comment", c.name, attachment.get("file_url")

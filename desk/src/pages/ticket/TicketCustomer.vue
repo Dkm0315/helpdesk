@@ -51,46 +51,99 @@
         <TicketCustomerTemplateFields v-if="isMobileView" />
 
         <TicketConversation class="grow" />
-        <div
-          class="w-full p-5"
-          @keydown.ctrl.enter.capture.stop="sendEmail"
-          @keydown.meta.enter.capture.stop="sendEmail"
-        >
-          <TicketTextEditor
-            v-if="showEditor"
-            ref="editor"
-            v-model:attachments="attachments"
-            v-model:content="editorContent"
-            v-model:expand="isExpanded"
-            :placeholder="__('Type a message')"
-            autofocus
-            @clear="() => (isExpanded = false)"
-            :uploadFunction="
-              (file: any) => uploadFunction(file, 'HD Ticket', props.ticketId)
-            "
+        <div v-if="showEditor" class="w-full border-t bg-white">
+          <div class="flex items-center gap-1.5 px-6 md:px-10 py-3">
+            <Button
+              variant="ghost"
+              :label="__('Reply')"
+              :class="[showEmailComposer ? '!bg-gray-300 hover:!bg-gray-200' : '']"
+              @click="toggleEmailComposer"
+            >
+              <template #prefix>
+                <EmailIcon class="h-4" />
+              </template>
+            </Button>
+            <Button
+              variant="ghost"
+              :label="__('Comment')"
+              :class="[
+                showCommentComposer ? '!bg-gray-300 hover:!bg-gray-200' : '',
+              ]"
+              @click="toggleCommentComposer"
+            >
+              <template #prefix>
+                <CommentIcon class="h-4" />
+              </template>
+            </Button>
+            <TypingIndicator :ticketId="ticketId" />
+          </div>
+          <div
+            v-show="showEmailComposer"
+            class="px-5 pb-5"
+            @keydown.ctrl.enter.capture.stop="sendEmail"
+            @keydown.meta.enter.capture.stop="sendEmail"
           >
-            <template #bottom-right>
-              <Button
-                :label="__('Send')"
-                theme="gray"
-                variant="solid"
-                :disabled="$refs.editor?.editor.isEmpty || send.loading"
-                :loading="send.loading"
-                @click="sendEmail"
-              />
-            </template>
-          </TicketTextEditor>
+            <TicketTextEditor
+              ref="emailEditor"
+              v-model:attachments="attachments"
+              v-model:content="editorContent"
+              :expand="true"
+              :placeholder="__('Type a message')"
+              autofocus
+              @clear="closeComposers"
+              :uploadFunction="
+                (file: any) => uploadFunction(file, 'HD Ticket', props.ticketId)
+              "
+            >
+              <template #bottom-right>
+                <Button
+                  :label="__('Send')"
+                  theme="gray"
+                  variant="solid"
+                  :disabled="emailEditor?.editor.isEmpty || send.loading"
+                  :loading="send.loading"
+                  @click="sendEmail"
+                />
+              </template>
+            </TicketTextEditor>
+          </div>
+          <div
+            v-show="showCommentComposer"
+            @keydown.ctrl.enter.capture.stop="sendComment"
+            @keydown.meta.enter.capture.stop="sendComment"
+          >
+            <CommentTextEditor
+              ref="commentEditor"
+              :label="__('Comment')"
+              :ticketId="ticketId"
+              :editable="showCommentComposer"
+              doctype="HD Ticket"
+              :placeholder="__('Add a comment')"
+              @submit="
+                () => {
+                  showCommentComposer = false;
+                  ticket.reload();
+                }
+              "
+              @discard="
+                () => {
+                  showCommentComposer = false;
+                }
+              "
+            />
+          </div>
         </div>
       </section>
       <!-- Ticket Sidebar only for desktop view-->
-      <TicketCustomerSidebar v-if="!isMobileView" @open="isExpanded = true" />
+      <TicketCustomerSidebar v-if="!isMobileView" @open="openEmailComposer" />
     </div>
     <TicketFeedback v-model:open="showFeedbackDialog" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { LayoutHeader } from "@/components";
+import { CommentTextEditor, LayoutHeader, TypingIndicator } from "@/components";
+import { CommentIcon, EmailIcon } from "@/components/icons/";
 import TicketCustomerSidebar from "@/components/ticket/TicketCustomerSidebar.vue";
 import { setupCustomizations } from "@/composables/formCustomisation";
 import { useActiveViewers } from "@/composables/realtime";
@@ -161,11 +214,13 @@ const ticket = createResource({
 });
 
 provide(ITicket, ticket);
-const editor = ref(null);
+const emailEditor = ref(null);
+const commentEditor = ref(null);
 const editorContent = ref("");
 const attachments = ref([]);
 const showFeedbackDialog = ref(false);
-const isExpanded = ref(false);
+const showEmailComposer = ref(false);
+const showCommentComposer = ref(false);
 
 const { isMobileView } = useScreenSize();
 const { $dialog, $socket } = globalStore();
@@ -230,6 +285,30 @@ const cleanupOldBannerDismissals = () => {
   }
 };
 
+function closeComposers() {
+  showEmailComposer.value = false;
+  showCommentComposer.value = false;
+}
+
+function openEmailComposer() {
+  showCommentComposer.value = false;
+  showEmailComposer.value = true;
+}
+
+function toggleEmailComposer() {
+  if (showCommentComposer.value) {
+    showCommentComposer.value = false;
+  }
+  showEmailComposer.value = !showEmailComposer.value;
+}
+
+function toggleCommentComposer() {
+  if (showEmailComposer.value) {
+    showEmailComposer.value = false;
+  }
+  showCommentComposer.value = !showCommentComposer.value;
+}
+
 const outsideHourSettings = createResource({
   url: "helpdesk.helpdesk.doctype.hd_ticket.api.show_outside_hours_banner",
   cache: ["OutsideHourBanner", props.ticketId],
@@ -252,9 +331,9 @@ const send = createResource({
     },
   }),
   onSuccess: () => {
-    editor.value.editor.commands.clearContent(true);
+    emailEditor.value.editor.commands.clearContent(true);
     attachments.value = [];
-    isExpanded.value = false;
+    showEmailComposer.value = false;
     ticket.reload();
   },
 });
@@ -283,6 +362,10 @@ function sendEmail() {
     return;
   }
   send.submit();
+}
+
+function sendComment() {
+  commentEditor.value?.submitComment();
 }
 
 function updateTicket(fieldname: string, value: string) {

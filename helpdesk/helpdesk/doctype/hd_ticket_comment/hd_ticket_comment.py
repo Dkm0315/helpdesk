@@ -47,7 +47,6 @@ def toggle_reaction(comment: str, emoji: str):
     # frappe.has_permission("Email Account", "create", throw=True)
     ticket = frappe.get_value("HD Ticket Comment", comment, "reference_ticket")
     frappe.has_permission("HD Ticket", "read", ticket, throw=True)
-    frappe.has_permission("HD Ticket", "write", ticket, throw=True)
 
     if not frappe.db.get_single_value("HD Settings", "enable_comment_reactions"):
         return

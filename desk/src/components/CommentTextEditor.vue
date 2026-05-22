@@ -1,6 +1,5 @@
 <template>
   <TextEditor
-    v-if="agentsList.data"
     ref="editorRef"
     :editor-class="[
       'prose-sm max-w-none',
@@ -12,7 +11,7 @@
     :starterkit-options="{ heading: { levels: [2, 3, 4, 5, 6] } }"
     :placeholder="placeholder"
     :editable="editable"
-    :mentions="dropdown"
+    :mentions="dropdown || []"
     @change="editable ? (newComment = $event) : null"
     :extensions="[PreserveVideoControls]"
     :uploadFunction="(file:any)=>uploadFunction(file, doctype, ticketId)"
@@ -126,7 +125,7 @@ import { storeToRefs } from "pinia";
 
 const { updateOnboardingStep } = useOnboarding("helpdesk");
 const { agents: agentsList, dropdown } = storeToRefs(useAgentStore());
-const { isManager } = useAuthStore();
+const { isAgent, isManager } = storeToRefs(useAuthStore());
 
 const props = defineProps({
   ticketId: {
@@ -200,7 +199,7 @@ async function submitComment() {
       },
     }),
     onSuccess: () => {
-      if (isManager) {
+      if (isManager.value) {
         updateOnboardingStep("comment_on_ticket");
       }
       emit("submit");
@@ -220,6 +219,9 @@ const editorRef = ref(null);
 const editor = computed(() => editorRef.value?.editor);
 
 onMounted(() => {
+  if (!isAgent.value && !isManager.value) {
+    return;
+  }
   if (
     agentsList.value.loading ||
     agentsList.value.data?.length ||
