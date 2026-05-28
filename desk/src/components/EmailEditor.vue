@@ -12,7 +12,7 @@
     :placeholder="placeholder"
     :editable="editable"
     @change="editable ? (newEmail = $event) : null"
-    :extensions="[PreserveVideoControls]"
+    :extensions="ghostExtensions"
     :uploadFunction="(file:any)=>uploadFunction(file, doctype, ticketId)"
   >
     <template #top>
@@ -88,6 +88,24 @@
           </template>
         </AttachmentItem>
       </div>
+      <!-- NextAI inline ghost status (FIX D, 2026-05-26).
+           Always rendered so toggling its content doesn't shift the layout;
+           v-show keeps the space allocated only while loading/visible. -->
+      <div v-show="ghostLoading || ghostVisible" class="flex px-10 mt-1">
+        <span class="inline-flex items-center gap-1 rounded-md border bg-surface-gray-1 px-2 py-1 text-xs text-ink-gray-5">
+          <Sparkles
+            class="h-3 w-3"
+            :class="ghostLoading ? 'animate-pulse' : ''"
+          />
+          <template v-if="ghostLoading">NextAI is drafting...</template>
+          <template v-else>
+            <kbd class="rounded border bg-white px-1 py-0.5 text-[10px] text-ink-gray-7">Tab</kbd>
+            to accept ·
+            <kbd class="rounded border bg-white px-1 py-0.5 text-[10px] text-ink-gray-7">Esc</kbd>
+            to dismiss
+          </template>
+        </span>
+      </div>
       <!-- TextEditor Fixed Menu -->
       <div
         class="flex justify-between overflow-scroll pl-10 py-2.5 items-center"
@@ -122,13 +140,24 @@
                 </Button>
               </template>
             </FileUploader>
-            <Button
-              variant="ghost"
-              @click="showSavedRepliesSelectorModal = true"
-            >
+          <Button
+            variant="ghost"
+            @click="showSavedRepliesSelectorModal = true"
+          >
               <template #icon>
                 <SavedReplyIcon class="h-4" />
               </template>
+            </Button>
+            <Button
+              variant="subtle"
+              class="ml-1 shrink-0"
+              :loading="ghostLoading"
+              @click="emit('request-ai')"
+            >
+              <template #icon>
+                <Sparkles class="h-4 w-4" />
+              </template>
+              Draft with NextAI
             </Button>
           </div>
           <TextEditorFixedMenu class="ml-1" :buttons="textEditorMenuButtons" />
@@ -191,6 +220,11 @@ import {
 import { useOnboarding } from "frappe-ui/frappe";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import SavedReplyIcon from "./icons/SavedReplyIcon.vue";
+import Sparkles from "~icons/lucide/sparkles";
+import {
+  InlineGhostSuggestion,
+  InlineGhostKey,
+} from "@/components/openclaw/InlineGhostSuggestion";
 
 const editorRef = ref(null);
 const showSavedRepliesSelectorModal = ref(false);
@@ -234,7 +268,7 @@ const label = computed(() => {
   return sendMail.loading ? "Sending..." : props.label;
 });
 
-const emit = defineEmits(["submit", "discard"]);
+const emit = defineEmits(["submit", "discard", "request-ai"]);
 
 const newEmail = useStorage<null | string>(
   "emailBoxContent" + props.ticketId,
@@ -265,6 +299,105 @@ onBeforeUnmount(() => {
   cleanup();
 });
 
+// --- Inline ghost-text completion (Gmail Smart Compose style) ----------
+const ghostSessionKey = ref<string | null>(null);
+
+async function fetchInlineCompletion(prefix: string): Promise<string> {
+  if (!props.ticketId) return "";
+  try {
+    const res = await fetch(
+      "/api/method/quant_customizations.api.openclaw_ai.suggest_inline_completion",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Frappe-CSRF-Token": (window as any).csrf_token || "",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          prefix,
+          source_doctype: props.doctype || "HD Ticket",
+          source_name: props.ticketId,
+          session_key: ghostSessionKey.value || undefined,
+        }),
+      }
+    );
+    if (!res.ok) return "";
+    const data = await res.json();
+    const message = data.message || data;
+    if (message?.session_key) ghostSessionKey.value = message.session_key;
+    return message?.completion || "";
+  } catch {
+    return "";
+  }
+}
+
+const ghostExtensions = computed(() => [
+  PreserveVideoControls,
+  InlineGhostSuggestion.configure({
+    fetchCompletion: fetchInlineCompletion,
+    debounceMs: 500,
+    minPrefixChars: 12,
+    maxPrefixChars: 4000,
+    enabled: () => true,
+  }),
+]);
+
+// Reflect the InlineGhost plugin's `loading` flag so the parent component
+// can show a spinner on the "Draft with NextAI" button. Hooked up after the
+// inner tiptap editor is created (see watcher below).
+const ghostLoading = ref(false);
+// Reflect whether a ghost suggestion is currently rendered after the caret.
+// Drives the "Tab to accept · Esc to dismiss" hint chip (FIX D, 2026-05-26)
+// so the user knows the inline draft is keyboard-actionable.
+const ghostVisible = ref(false);
+let ghostTxnUnsubscribe: (() => void) | null = null;
+
+function bindGhostLoadingSubscription(ed: any) {
+  if (!ed) return;
+  const handler = () => {
+    const ps = InlineGhostKey.getState(ed.state);
+    ghostLoading.value = !!ps?.loading;
+    // ghostVisible derives from the same plugin state: a ghost is visible
+    // when both the text exists AND it's anchored to a caret position.
+    ghostVisible.value = !!(ps?.ghost && ps?.anchorPos != null);
+  };
+  ed.on("transaction", handler);
+  ghostTxnUnsubscribe = () => {
+    try {
+      ed.off("transaction", handler);
+    } catch {
+      // ignore — editor already destroyed
+    }
+  };
+}
+
+function triggerInlineGhost(prefixOverride?: string) {
+  const ed = editorRef.value?.editor;
+  if (!ed) return;
+  // chain() rebuilds command list; call the raw command directly.
+  (ed.commands as any).triggerInlineGhost?.(prefixOverride);
+}
+
+watch(
+  () => editorRef.value?.editor,
+  (ed) => {
+    if (ghostTxnUnsubscribe) {
+      ghostTxnUnsubscribe();
+      ghostTxnUnsubscribe = null;
+    }
+    if (ed) bindGhostLoadingSubscription(ed);
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(() => {
+  if (ghostTxnUnsubscribe) {
+    ghostTxnUnsubscribe();
+    ghostTxnUnsubscribe = null;
+  }
+});
+
 const toEmailsClone = ref([...props.toEmails]);
 const ccEmailsClone = ref([...props.ccEmails]);
 const bccEmailsClone = ref([...props.bccEmails]);
@@ -280,6 +413,18 @@ function applySavedReplies(template: string) {
     ? (newEmail.value = template)
     : (newEmail.value = newEmail.value + "\n" + template);
   showSavedRepliesSelectorModal.value = false;
+}
+
+function insertDraft(template: string) {
+  if (!template) return;
+
+  newEmail.value = isContentEmpty(newEmail.value)
+    ? template
+    : `${newEmail.value}\n\n${template}`;
+
+  nextTick(() => {
+    editorRef.value?.editor?.commands?.focus("end");
+  });
 }
 
 const sendMail = createResource({
@@ -387,7 +532,23 @@ const editor = computed(() => {
 
 defineExpose({
   addToReply,
+  insertDraft,
   editor,
   submitMail,
+  triggerInlineGhost,
+  ghostLoading,
+  ghostVisible,
 });
 </script>
+
+<style>
+/* Inline ghost-text suggestion (Gmail Smart Compose / Gemini style).
+   The widget decoration is rendered globally on the editor DOM so we use a
+   non-scoped block here. */
+.oc-inline-ghost {
+  opacity: 0.4;
+  font-style: italic;
+  pointer-events: none;
+  user-select: none;
+}
+</style>

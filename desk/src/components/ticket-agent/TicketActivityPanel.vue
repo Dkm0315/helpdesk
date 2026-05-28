@@ -46,6 +46,7 @@
         ticketAgentActivitiesRef.scrollToLatestActivity();
       }
     "
+    @open-ai="(mode) => emit('open-ai', mode)"
   />
 </template>
 
@@ -81,6 +82,7 @@ const ticketAgentActivitiesRef = ref(null);
 const communicationAreaRef = ref(null);
 const telephonyStore = useTelephonyStore();
 const { isCallingEnabled } = storeToRefs(telephonyStore);
+const emit = defineEmits(["open-ai"]);
 
 const tabs: ComputedRef<TabObject[]> = computed(() => {
   const _tabs: TabObject[] = [
@@ -247,6 +249,40 @@ function filterActivities(eventType: TicketTab) {
   }
   return _activities.value.filter((activity) => activity.type === eventType);
 }
+
+function insertReply(content: string) {
+  communicationAreaRef.value?.insertEmailDraft?.(content);
+}
+
+function insertComment(content: string) {
+  communicationAreaRef.value?.insertCommentDraft?.(content);
+}
+
+function openAIFromComposer(mode: "reply" | "comment") {
+  communicationAreaRef.value?.openAIFromComposer?.(mode);
+}
+
+function toggleAIDrawer(surface?: "helpdesk_ticket" | "helpdesk_comment") {
+  communicationAreaRef.value?.toggleAIDrawer?.(surface);
+}
+
+const aiDrawerOpen = computed(() => {
+  const exposed = communicationAreaRef.value?.aiDrawerOpen;
+  if (exposed == null) return false;
+  // Vue may or may not auto-unwrap a defineExpose'd ref depending on access
+  // path. Be defensive.
+  return !!(typeof exposed === "object" && "value" in (exposed as object)
+    ? (exposed as any).value
+    : exposed);
+});
+
+defineExpose({
+  insertReply,
+  insertComment,
+  openAIFromComposer,
+  toggleAIDrawer,
+  aiDrawerOpen,
+});
 </script>
 
 <style scoped></style>

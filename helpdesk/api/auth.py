@@ -24,15 +24,21 @@ def get_user():
         as_dict=True,
     )
 
+    roles = frappe.get_roles(current_user)
+    customer_intelligence_roles = {
+        "Product Head",
+        "CTO",
+        "Professional Services Lead",
+    }
     is_agent = _is_agent()
-    is_admin = ("System Manager" or "Admistrator") in frappe.get_roles(current_user)
-    has_desk_access = is_agent or is_admin
+    is_admin = "System Manager" in roles
+    has_desk_access = is_agent or is_admin or bool(set(roles).intersection(customer_intelligence_roles))
     user_image = user.user_image
     user_first_name = user.first_name
     user_name = user.full_name
     user_id = user.name
     username = user.username
-    is_manager = ("Agent Manager") in frappe.get_roles(current_user)
+    is_manager = "Agent Manager" in roles
     language = user.language or frappe.db.get_single_value(
         "System Settings", "language"
     )
@@ -45,6 +51,7 @@ def get_user():
         "is_agent": is_agent,
         "user_id": user_id,
         "is_manager": is_manager,
+        "roles": roles,
         "user_image": user_image,
         "user_first_name": user_first_name,
         "user_name": user_name,

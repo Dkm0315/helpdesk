@@ -155,6 +155,12 @@ const allViews = computed(() => {
   let items = isCustomerPortal.value
     ? customerPortalSidebarOptions
     : agentPortalSidebarOptions;
+  const userRoles = new Set(authStore.roles || []);
+
+  items = items.filter((item) => {
+    if (!item.requiredRoles?.length) return true;
+    return item.requiredRoles.some((role) => userRoles.has(role));
+  });
 
   if (!isCallingEnabled.value) {
     items = items.filter((item) => item.label !== __("Call Logs"));

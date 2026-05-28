@@ -51,6 +51,21 @@
       v-model="viewDialog"
       @update="(view, action) => handleView(view, action)"
     />
+    <!-- Floating "Ask NextAI" launcher (workspace-scoped on the list page). -->
+    <OpenClawLauncher
+      v-if="!isCustomerPortal"
+      :hidden="aiDrawerOpen"
+      tooltip="Ask NextAI"
+      @toggle="aiDrawerOpen = !aiDrawerOpen"
+    />
+    <NextAIPanel
+      v-if="aiDrawerOpen"
+      :open="aiDrawerOpen"
+      surface="ticket_list"
+      reference-doctype="HD Ticket"
+      reference-name=""
+      @update:open="(v) => (aiDrawerOpen = v)"
+    />
   </div>
 </template>
 
@@ -63,6 +78,8 @@ import {
   TicketIcon,
   UnpinIcon,
 } from "@/components/icons";
+import OpenClawLauncher from "@/components/openclaw/OpenClawLauncher.vue";
+import NextAIPanel from "@/components/openclaw/NextAIPanel.vue";
 import ExportModal from "@/components/ticket/ExportModal.vue";
 import ViewBreadcrumbs from "@/components/ViewBreadcrumbs.vue";
 import ViewModal from "@/components/ViewModal.vue";
@@ -95,6 +112,7 @@ const { $dialog, $socket } = globalStore();
 const { isManager, userId } = useAuthStore();
 
 const listViewRef = ref(null);
+const aiDrawerOpen = ref(false);
 const showExportModal = ref(false);
 
 const { getStatus } = useTicketStatusStore();

@@ -3,6 +3,8 @@ import LucideContact2 from "~icons/lucide/contact-2";
 import LucideFileText from "~icons/lucide/file-text";
 import LucideRocket from "~icons/lucide/rocket";
 import LucideShoppingCart from "~icons/lucide/shopping-cart";
+import LucideShieldCheck from "~icons/lucide/shield-check";
+import LucideSparkles from "~icons/lucide/sparkles";
 import LucideTicket from "~icons/lucide/ticket";
 import { OrganizationsIcon } from "../icons";
 import PhoneIcon from "../icons/PhoneIcon.vue";
@@ -13,6 +15,22 @@ export const agentPortalSidebarOptions = [
     label: __("Tickets"),
     icon: LucideTicket,
     to: "TicketsAgent",
+  },
+  {
+    label: __("NextAI"),
+    icon: LucideSparkles,
+    to: "NextAIWorkspace",
+  },
+  {
+    label: __("CTO Workspace"),
+    icon: LucideShieldCheck,
+    to: "OpenClawCTOWorkspace",
+    requiredRoles: [
+      "System Manager",
+      "Product Head",
+      "CTO",
+      "Professional Services Lead",
+    ],
   },
   {
     label: __("Get Started"),

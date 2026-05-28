@@ -21,6 +21,17 @@
           size="md"
           :hide-name="true"
         />
+        <Button
+          label="Send to Gameplan"
+          variant="subtle"
+          :disabled="!canHandoff"
+          :title="canHandoff ? 'Draft a Gameplan task from this ticket' : 'You need Gameplan write access to hand off tickets.'"
+          @click="onSendToGameplanClick"
+        >
+          <template #prefix>
+            <Send class="h-4 w-4" />
+          </template>
+        </Button>
         <!-- Navigation -->
         <TicketNavigation :key="ticket.name" />
         <!-- Custom Actions -->
@@ -101,6 +112,7 @@ import { setupCustomizations } from "@/composables/formCustomisation";
 import { useNotifyTicketUpdate } from "@/composables/realtime";
 import { useShortcut } from "@/composables/shortcuts";
 import { useView } from "@/composables/useView";
+import { useAuthStore } from "@/stores/auth";
 import { globalStore } from "@/stores/globalStore";
 import { useTicketStatusStore } from "@/stores/ticketStatus";
 import {
@@ -126,6 +138,7 @@ import {
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import LucideMerge from "~icons/lucide/merge";
+import Send from "~icons/lucide/send";
 import { IndicatorIcon } from "../icons";
 import TicketNavigation from "./TicketNavigation.vue";
 import TicketSLA from "./TicketSLA.vue";
@@ -137,6 +150,33 @@ defineProps({
     required: true,
   },
 });
+const emit = defineEmits(["open-ai", "send-to-gameplan"]);
+
+// Gameplan handoff gate — Helpdesk SPA doesn't expose window.frappe, so use
+// the existing auth store.  Any admin/agent/manager can initiate the handoff;
+// the backend re-checks Gameplan write permission on send_to_gameplan and
+// rejects if needed.
+const authStore = useAuthStore();
+const canHandoff = computed(() => Boolean(
+  authStore.isAdmin || authStore.isAgent || authStore.isManager,
+));
+
+function onSendToGameplanClick() {
+  if (!ticket?.value?.doc?.name) return;
+  const payload = {
+    ticketName: ticket.value.doc.name,
+    ticketDoctype: "HD Ticket",
+    subject: ticket.value.doc.subject,
+  };
+  // Emit for tests / direct parent wiring.
+  emit("send-to-gameplan", payload);
+  // Dispatch a window event so CommunicationArea (deep in the tree, mounts the
+  // modal as a teleported sibling of the drawer) can pick it up without
+  // prop-drilling through TicketActivityPanel.
+  window.dispatchEvent(
+    new CustomEvent("openclaw:send-to-gameplan", { detail: payload }),
+  );
+}
 
 const route = useRoute();
 const router = useRouter();
