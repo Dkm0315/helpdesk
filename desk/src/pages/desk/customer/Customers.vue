@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col">
+  <div class="flex h-full flex-col bg-white text-ink-gray-9">
     <LayoutHeader>
       <template #left-header>
         <div class="text-lg font-medium text-gray-900">Customers</div>
@@ -17,12 +17,14 @@
         </Button>
       </template>
     </LayoutHeader>
-    <ListViewBuilder
-      ref="listViewRef"
-      :options="options"
-      @row-click="openCustomer"
-      @empty-state-action="isDialogVisible = true"
-    />
+    <div class="flex-1 overflow-auto bg-white p-4">
+      <ListViewBuilder
+        ref="listViewRef"
+        :options="options"
+        @row-click="openCustomer"
+        @empty-state-action="isDialogVisible = true"
+      />
+    </div>
     <NewCustomerDialog
       v-model="isDialogVisible"
       @customer-created="handleCustomer"

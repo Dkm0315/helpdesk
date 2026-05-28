@@ -14,6 +14,7 @@ declare module "vue-router" {
     agent?: boolean;
     admin?: boolean;
     public?: boolean;
+    requiredRoles?: string[];
     onSuccessRoute?: string;
     parent?: string;
   }
@@ -64,6 +65,24 @@ const routes = [
     name: "SearchAgent",
     component: () => import("@/pages/SearchAgent.vue"),
     meta: { auth: true },
+  },
+  {
+    path: "/nextai",
+    name: "NextAIWorkspace",
+    component: () => import("@/pages/openclaw/AIWorkspace.vue"),
+  },
+  {
+    path: "/cto",
+    name: "OpenClawCTOWorkspace",
+    component: () => import("@/pages/openclaw/CTOWorkspace.vue"),
+    meta: {
+      requiredRoles: [
+        "System Manager",
+        "Product Head",
+        "CTO",
+        "Professional Services Lead",
+      ],
+    },
   },
   {
     path: "/kb/articles/:articleId",
@@ -277,6 +296,11 @@ router.beforeEach(async (to, _, next) => {
       name: "TicketCustomer",
       params: { ticketId },
     });
+  } else if (
+    to.meta.requiredRoles?.length &&
+    !to.meta.requiredRoles.some((role) => authStore.roles.includes(role))
+  ) {
+    next({ name: "TicketsAgent" });
   } else {
     next();
   }
