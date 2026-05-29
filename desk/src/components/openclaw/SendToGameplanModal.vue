@@ -216,10 +216,12 @@ const rawDraft = ref("");
 const template = ref<HandoffTemplate | null>(null);
 const aiRun = ref<string | null>(null);
 
-const project = ref("");
+type ProjectOption = { label: string; value: string };
+
+const project = ref<ProjectOption | string | null>(null);
 const sprint = ref("");
 const triggerAgent = ref(false);
-const projectOptions = ref<string[]>([]);
+const projectOptions = ref<ProjectOption[]>([]);
 
 const afterSend = ref<{ gp_task: string; handoff: string } | null>(null);
 const agentStatus = ref<any>(null);
@@ -234,7 +236,12 @@ watch(template, (t) => {
   acceptanceText.value = (t.acceptance_criteria || []).join("\n");
   reproText.value = (t.repro_steps || []).join("\n");
   workaroundsText.value = (t.workarounds || []).join("\n");
-  if (t.suggested_project && !project.value) project.value = t.suggested_project;
+  if (t.suggested_project && !project.value) {
+    const match = projectOptions.value.find(
+      (option) => option.value === t.suggested_project || option.label === t.suggested_project,
+    );
+    if (match) project.value = match;
+  }
   if (t.suggested_sprint && !sprint.value) sprint.value = t.suggested_sprint;
   if (t.affected_components) t.affected_components_text = t.affected_components.join(", ");
 });
@@ -263,8 +270,15 @@ onMounted(() => {
 });
 
 const canSend = computed(
-  () => !!template.value && !!template.value.key_issue && !!project.value && !sending.value,
+  () => !!template.value && !!template.value.key_issue && !!projectName.value && !sending.value,
 );
+
+const projectName = computed(() => {
+  const value = project.value;
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value.value || "";
+});
 
 async function loadDraft() {
   loading.value = true;
@@ -316,14 +330,20 @@ async function loadProjectOptions() {
     if (!res.ok) return;
     const data = await res.json();
     const rows = (data.message || []) as Array<{ name: string; title?: string }>;
-    projectOptions.value = rows.map((r) => r.title || r.name);
+    projectOptions.value = rows.map((r) => ({
+      label: r.title ? `${r.title} (${r.name})` : String(r.name),
+      value: String(r.name),
+    }));
+    if (!project.value && projectOptions.value.length === 1) {
+      project.value = projectOptions.value[0];
+    }
   } catch {
     /* non-fatal */
   }
 }
 
 async function send() {
-  if (!template.value || !project.value) return;
+  if (!template.value || !projectName.value) return;
   sending.value = true;
   try {
     const fullTemplate: HandoffTemplate = {
@@ -356,7 +376,7 @@ async function send() {
         credentials: "same-origin",
         body: JSON.stringify({
           ticket_name: props.ticketName,
-          project: project.value,
+          project: projectName.value,
           sprint: sprint.value || null,
           template: fullTemplate,
           ai_run: aiRun.value,
@@ -426,7 +446,7 @@ function reset() {
   rawDraft.value = "";
   template.value = null;
   aiRun.value = null;
-  project.value = "";
+  project.value = null;
   sprint.value = "";
   triggerAgent.value = false;
   afterSend.value = null;

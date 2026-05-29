@@ -60,10 +60,29 @@
           <h2 class="font-semibold text-ink-gray-9">Generate Review Commands</h2>
           <p class="mt-1 text-sm text-ink-gray-5">Commands are generated for review only. Nothing is executed.</p>
           <div class="mt-4 space-y-3">
-            <FormControl v-model="commandForm.customer" label="Customer" placeholder="HD Customer name" />
-            <FormControl v-model="commandForm.env" label="Environment" placeholder="UAT / Prod / CUG" />
+            <FormControl
+              v-model="commandForm.customer"
+              type="autocomplete"
+              label="Customer"
+              :options="customerOptions"
+              placeholder="Select customer"
+            />
+            <FormControl
+              v-model="commandForm.environment"
+              type="autocomplete"
+              label="Environment"
+              :options="environmentOptions"
+              :disabled="!selectedCustomer"
+              placeholder="Select environment"
+            />
             <FormControl v-model="commandForm.task" label="Task" placeholder="install qdrant, collect diagnostics..." />
-            <Button label="Generate Commands" theme="gray" :loading="commands.loading" @click="generateCommands" />
+            <Button
+              label="Generate Commands"
+              theme="gray"
+              :loading="commands.loading"
+              :disabled="!selectedCustomer || !selectedEnvironment || !commandForm.task"
+              @click="generateCommands"
+            />
           </div>
           <pre v-if="commandOutput" class="mt-4 max-h-80 overflow-auto rounded-xl bg-surface-gray-2 p-3 text-xs text-ink-gray-8">{{ commandOutput }}</pre>
         </section>
@@ -87,10 +106,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Badge, Button, ErrorMessage, FormControl, createResource, usePageMeta } from 'frappe-ui'
 
-const commandForm = reactive({ customer: '', env: '', task: '' })
+type SelectOption = { label: string; value: string }
+
+const commandForm = reactive<{ customer: SelectOption | string | null; environment: SelectOption | string | null; task: string }>({
+  customer: null,
+  environment: null,
+  task: '',
+})
 const commandOutput = ref('')
 
 const dashboard = createResource({
@@ -98,12 +123,17 @@ const dashboard = createResource({
   auto: true,
 })
 
+const commandOptions = createResource({
+  url: 'quant_customizations.api.cto_workspace.get_command_options',
+  auto: true,
+})
+
 const commands = createResource({
   url: 'quant_customizations.api.airgap_commands.generate_commands',
   makeParams() {
     return {
-      customer: commandForm.customer,
-      env_label: commandForm.env,
+      customer: selectedCustomer.value,
+      env_label: selectedEnvironment.value,
       task: commandForm.task,
     }
   },
@@ -121,6 +151,44 @@ const cards = computed(() => {
     { label: 'Low Hour Ledgers', value: data.low_balance_ledgers ?? 0 },
   ]
 })
+
+const selectedCustomer = computed(() => optionValue(commandForm.customer))
+const selectedEnvironment = computed(() => optionValue(commandForm.environment))
+
+const customerOptions = computed<SelectOption[]>(() => {
+  return (commandOptions.data?.customers || []).map((customer: any) => ({
+    label: customer.customer_name ? `${customer.customer_name} (${customer.name})` : String(customer.name),
+    value: String(customer.name),
+  }))
+})
+
+const environmentOptions = computed<SelectOption[]>(() => {
+  const customer = selectedCustomer.value
+  return (commandOptions.data?.environments || [])
+    .filter((env: any) => !customer || env.customer === customer)
+    .map((env: any) => ({
+      label: [
+        env.environment_label,
+        env.engine ? `Engine: ${env.engine}` : '',
+        env.topology ? `Topology: ${env.topology}` : '',
+      ].filter(Boolean).join(' · '),
+      value: String(env.name),
+    }))
+})
+
+watch(
+  () => selectedCustomer.value,
+  () => {
+    commandForm.environment = null
+    commandOutput.value = ''
+  },
+)
+
+function optionValue(value: SelectOption | string | null): string {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value.value || ''
+}
 
 function generateCommands() {
   commandOutput.value = ''
