@@ -218,7 +218,7 @@ const aiRun = ref<string | null>(null);
 
 type ProjectOption = { label: string; value: string };
 
-const project = ref<ProjectOption | string | null>(null);
+const project = ref("");
 const sprint = ref("");
 const triggerAgent = ref(false);
 const projectOptions = ref<ProjectOption[]>([]);
@@ -240,7 +240,7 @@ watch(template, (t) => {
     const match = projectOptions.value.find(
       (option) => option.value === t.suggested_project || option.label === t.suggested_project,
     );
-    if (match) project.value = match;
+    if (match) project.value = match.value;
   }
   if (t.suggested_sprint && !sprint.value) sprint.value = t.suggested_sprint;
   if (t.affected_components) t.affected_components_text = t.affected_components.join(", ");
@@ -274,10 +274,7 @@ const canSend = computed(
 );
 
 const projectName = computed(() => {
-  const value = project.value;
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  return value.value || "";
+  return project.value || "";
 });
 
 async function loadDraft() {
@@ -335,7 +332,7 @@ async function loadProjectOptions() {
       value: String(r.name),
     }));
     if (!project.value && projectOptions.value.length === 1) {
-      project.value = projectOptions.value[0];
+      project.value = projectOptions.value[0].value;
     }
   } catch {
     /* non-fatal */
@@ -446,7 +443,7 @@ function reset() {
   rawDraft.value = "";
   template.value = null;
   aiRun.value = null;
-  project.value = null;
+  project.value = "";
   sprint.value = "";
   triggerAgent.value = false;
   afterSend.value = null;

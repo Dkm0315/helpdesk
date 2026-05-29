@@ -111,9 +111,9 @@ import { Badge, Button, ErrorMessage, FormControl, createResource, usePageMeta }
 
 type SelectOption = { label: string; value: string }
 
-const commandForm = reactive<{ customer: SelectOption | string | null; environment: SelectOption | string | null; task: string }>({
-  customer: null,
-  environment: null,
+const commandForm = reactive<{ customer: string; environment: string; task: string }>({
+  customer: '',
+  environment: '',
   task: '',
 })
 const commandOutput = ref('')
@@ -179,15 +179,13 @@ const environmentOptions = computed<SelectOption[]>(() => {
 watch(
   () => selectedCustomer.value,
   () => {
-    commandForm.environment = null
+    commandForm.environment = ''
     commandOutput.value = ''
   },
 )
 
-function optionValue(value: SelectOption | string | null): string {
-  if (!value) return ''
-  if (typeof value === 'string') return value
-  return value.value || ''
+function optionValue(value: string): string {
+  return value || ''
 }
 
 function generateCommands() {
