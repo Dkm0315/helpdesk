@@ -40,7 +40,7 @@
                 Customer Intelligence
               </div>
               <p class="mt-1 text-sm text-ink-gray-5">
-                System Manager-only lifecycle, sizing, hours, and credential metadata.
+                Restricted lifecycle, sizing, hours, and credential metadata.
               </p>
             </div>
             <Button
