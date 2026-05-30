@@ -1,6 +1,10 @@
 <template>
   <div v-if="ticket.doc?.name" class="flex-1">
-    <TicketHeader :viewers="viewers" @open-ai="openAIFromComposer('reply')" />
+    <TicketHeader
+      :viewers="viewers"
+      @open-ai="openAIFromComposer('reply')"
+      @send-to-gameplan="onSendToGameplanEvent"
+    />
     <div class="h-full flex overflow-hidden">
       <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Tabs & Communication Area -->
