@@ -54,15 +54,18 @@
       <label v-for="filter in presentation.filters" :key="filter.id" class="oc-filter">
         <span>{{ filter.label }}</span>
         <select
-          :value="filter.selected || ''"
-          :disabled="!filter.options?.length || !filter.action?.command"
+          v-if="filter.options?.length"
+          :value="selectedValue(filter)"
+          :disabled="!filterCommand(filter)"
+          :aria-label="filter.label"
           @change="applyFilter(filter, $event)"
         >
-          <option value="" disabled>Select</option>
+          <option value="" disabled>Choose...</option>
           <option v-for="option in filter.options || []" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </select>
+        <span v-else class="oc-filter-empty">No values in your scope</span>
       </label>
     </div>
 
@@ -131,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import LucideArrowUpRight from '~icons/lucide/arrow-up-right'
 import LucideBarChart3 from '~icons/lucide/bar-chart-3'
 import LucideChevronRight from '~icons/lucide/chevron-right'
@@ -181,6 +184,17 @@ type Presentation = {
 
 const props = defineProps<{ presentation: Presentation }>()
 const emit = defineEmits<{ (event: 'action', command: string): void }>()
+const filterSelections = ref<Record<string, string>>({})
+
+watch(
+  () => props.presentation.filters,
+  (filters) => {
+    filterSelections.value = Object.fromEntries(
+      (filters || []).map((filter) => [filter.id, filter.selected || '']),
+    )
+  },
+  { immediate: true, deep: true },
+)
 
 const kindIcon = computed(() => ({
   menu: LucideLayoutGrid,
@@ -232,13 +246,29 @@ function emitAction(command: string) {
   if (command?.trim()) emit('action', command.trim())
 }
 
+function selectedValue(filter: PresentationFilter): string {
+  return filterSelections.value[filter.id] ?? filter.selected ?? ''
+}
+
+function filterCommand(filter: PresentationFilter): string {
+  if (filter.action?.command) return filter.action.command
+  return (props.presentation.actions || []).find((action) =>
+    action.kind === 'filter' || /^refresh$/i.test(action.label),
+  )?.command || ''
+}
+
 function applyFilter(filter: PresentationFilter, event: Event) {
   const value = (event.target as HTMLSelectElement)?.value
-  const template = filter.action?.command
+  const template = filterCommand(filter)
   if (!value || !template) return
+  filterSelections.value = { ...filterSelections.value, [filter.id]: value }
+  const token = `${filter.id}=${value}`
+  const argumentPattern = new RegExp(`(?:^|\\s)${filter.id}=[^\\s]+`)
   const command = template.includes('{value}')
     ? template.replaceAll('{value}', value)
-    : template + ' ' + filter.id + '=' + value
+    : argumentPattern.test(template)
+      ? template.replace(argumentPattern, (match) => `${match.startsWith(' ') ? ' ' : ''}${token}`)
+      : `${template} ${token}`
   emitAction(command)
 }
 </script>
@@ -424,6 +454,25 @@ function applyFilter(filter: PresentationFilter, event: Event) {
   padding: 0 0.5rem;
   color: var(--ink-gray-8, #1f2937);
   font-size: 0.75rem;
+}
+.oc-filter select:focus-visible {
+  outline: 2px solid #14b8a6;
+  outline-offset: 1px;
+}
+.oc-filter select:disabled {
+  cursor: not-allowed;
+  background: var(--surface-gray-1, #f8fafc);
+  color: var(--ink-gray-5, #6b7280);
+}
+.oc-filter-empty {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  border: 1px dashed var(--surface-gray-3, #e5e7eb);
+  border-radius: 6px;
+  padding: 0 0.5rem;
+  color: var(--ink-gray-5, #6b7280);
+  font-weight: 500;
 }
 .oc-table-section {
   min-width: 0;

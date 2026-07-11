@@ -95,7 +95,6 @@
             :key="action.token"
             type="button"
             :title="action.hint"
-            :disabled="state.running.value"
             @click="runCommand(action.token)"
           >
             <component :is="activeControlIcon" class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -321,6 +320,11 @@
             </span>
           </div>
 
+          <div v-if="queuedCommand" class="oc-command-queue">
+            <span>Next: {{ queuedCommand }}</span>
+            <button type="button" aria-label="Remove queued command" @click="queuedCommand = ''">Cancel</button>
+          </div>
+
           <div class="oc-composer-toolbar flex items-center justify-between border-t px-2 py-1.5">
             <div class="flex items-center gap-1">
             <FileUploader
@@ -397,6 +401,7 @@ import LucideLoaderCircle from '~icons/lucide/loader-circle'
 import LucideUserRound from '~icons/lucide/user-round'
 import LucideShieldCheck from '~icons/lucide/shield-check'
 import LucideWorkflow from '~icons/lucide/workflow'
+import LucideBoxes from '~icons/lucide/boxes'
 import NextAISuggestionList, { type SuggestionItem } from './NextAISuggestionList.vue'
 import NextAIPresentation from './NextAIPresentation.vue'
 import {
@@ -459,7 +464,7 @@ const { state, start, stop, steer, modify, cleanup } = useStreamingRun()
 const isWorkspace = computed(() => props.layout === 'workspace')
 const canInsert = computed(() => !isWorkspace.value && Boolean(props.getParentEditor || props.onInsert))
 const selectedAgentId = computed(() => inferPersona(promptText.value) || activeAgentId.value)
-type ControlGroupId = 'personal' | 'governance' | 'runtime'
+type ControlGroupId = 'oss-manager' | 'personal' | 'governance' | 'runtime'
 type ControlTab = {
   id: ControlGroupId
   label: string
@@ -470,6 +475,16 @@ type ControlTab = {
 const activeControlGroup = ref<ControlGroupId>('personal')
 const controlGroupTouched = ref(false)
 const controlGroupDefinitions: Array<Omit<ControlTab, 'actions'>> = [
+  {
+    id: 'oss-manager',
+    label: 'OSS Manager',
+    icon: LucideBoxes,
+    commandNames: [
+      'oss-overview', 'solution-design', 'ticket-brief', 'reply-draft', 'delivery-plan',
+      'change-scan', 'test-plan', 'validate', 'validation-status', 'release-evidence',
+      'documentation-status', 'documentation-impact', 'documentation-update', 'runbooks',
+    ],
+  },
   {
     id: 'personal',
     label: 'Personal',
@@ -522,6 +537,7 @@ const accessTierLabel = computed(() => {
   return labels[accessTier.value] || 'Personal'
 })
 const controlCenterSummary = computed(() => {
+  if (activeControlGroup.value === 'oss-manager') return 'Architecture, delivery, ticket support, customer replies, documentation, and validation'
   if (activeControlGroup.value === 'governance') return 'Usage, limits, audit, security, evals, validation, and documentation'
   if (activeControlGroup.value === 'runtime') return 'Providers, models, tools, extensions, channels, and agents'
   return 'Your tickets, token ledger, memory, sessions, and artifacts'
@@ -598,6 +614,7 @@ function isLastAssistant(idx: number): boolean {
 }
 
 const pendingRunName = ref<string>('')
+const queuedCommand = ref<string>('')
 
 const hasStreamingAssistant = computed(() =>
   messages.value.some(m => m.role === 'assistant' && m.status === 'streaming'),
@@ -631,6 +648,7 @@ function clearConversation() {
   state.error.value = ''
   messages.value = []
   activeAgentId.value = null
+  queuedCommand.value = ''
 }
 
 // Bridge: every time a token arrives, append it to the last streaming
@@ -1061,9 +1079,11 @@ async function loadCatalog() {
     })
     catalog.value = result
     if (!controlGroupTouched.value) {
-      activeControlGroup.value = ['permission_manager', 'admin'].includes(String(result?.context?.access_tier || ''))
-        ? 'governance'
-        : 'personal'
+      activeControlGroup.value = result?.personas?.['oss-manager-tester']
+        ? 'oss-manager'
+        : ['permission_manager', 'admin'].includes(String(result?.context?.access_tier || ''))
+          ? 'governance'
+          : 'personal'
     }
   } catch (err: any) {
     catalog.value = null
@@ -1265,13 +1285,28 @@ async function submit() {
 
 async function runCommand(command: string) {
   const value = String(command || '').trim()
-  if (!value || state.running.value || !editor.value) return
+  if (!value || !editor.value) return
+  if (state.running.value) {
+    queuedCommand.value = value
+    return
+  }
   closeSuggestion()
   editor.value.commands.setContent(`<p>${escapeHtml(value)}</p>`)
   promptText.value = value
   await nextTick()
   await submit()
 }
+
+watch(
+  () => state.running.value,
+  async (running, wasRunning) => {
+    if (running || !wasRunning || !queuedCommand.value) return
+    const nextCommand = queuedCommand.value
+    queuedCommand.value = ''
+    await nextTick()
+    await runCommand(nextCommand)
+  },
+)
 
 async function onStop() {
   if (!currentRun.value) return
@@ -1438,6 +1473,28 @@ watch(
 }
 .oc-composer-toolbar {
   border-color: var(--surface-gray-2, #f3f4f6);
+}
+.oc-command-queue {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid #ccfbf1;
+  background: #f0fdfa;
+  padding: 0.4rem 0.65rem;
+  color: #115e59;
+  font-size: 0.7rem;
+}
+.oc-command-queue span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-command-queue button {
+  flex: 0 0 auto;
+  color: #0f766e;
+  font-weight: 600;
 }
 .oc-icon-button,
 .oc-send-button {
