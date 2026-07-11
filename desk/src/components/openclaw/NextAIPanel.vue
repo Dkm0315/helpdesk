@@ -89,7 +89,14 @@
                assistant message with status='streaming' carries the live
                thinking-line + tool chips + control buttons. -->
           <div v-else class="flex flex-col items-start gap-1.5">
+            <NextAIPresentation
+              v-if="msg.presentation"
+              class="max-w-full"
+              :presentation="msg.presentation"
+              @action="runCommand"
+            />
             <div
+              v-else
               class="oc-rich-message max-w-[90%] rounded-2xl rounded-bl-sm border bg-surface-gray-1 px-3 py-2 text-sm leading-6 text-ink-gray-8 shadow-sm"
               :class="{'border-red-200 bg-red-50 text-red-700': msg.status === 'error'}"
             >
@@ -199,6 +206,19 @@
           <Sparkles class="h-4 w-4 text-ink-gray-7" />
         </div>
         <div class="text-sm font-medium text-ink-gray-8">{{ emptyStateTitle }}</div>
+        <div v-if="quickActions.length" class="oc-quick-actions">
+          <button
+            v-for="action in quickActions"
+            :key="action.token"
+            type="button"
+            :title="action.hint"
+            @click="runCommand(action.token)"
+          >
+            <span>{{ action.token }}</span>
+            <small>{{ action.hint }}</small>
+            <LucideArrowRight class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div v-if="error && !messages.some(m => m.role === 'system')" class="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -228,6 +248,8 @@
               v-if="suggestionState.open"
               :items="suggestionState.items"
               :command="onSuggestionPick"
+              :loading="catalogLoading"
+              :empty-label="suggestionEmptyLabel"
             />
           </div>
         </Teleport>
@@ -318,6 +340,7 @@ import Mention from '@tiptap/extension-mention'
 import { PluginKey } from '@tiptap/pm/state'
 import { FileUploader, toast } from 'frappe-ui'
 import Sparkles from '~icons/lucide/sparkles'
+import LucideArrowRight from '~icons/lucide/arrow-right'
 import LucideX from '~icons/lucide/x'
 import LucideWrench from '~icons/lucide/wrench'
 import LucidePaperclip from '~icons/lucide/paperclip'
@@ -325,6 +348,7 @@ import LucideSend from '~icons/lucide/send'
 import LucideEraser from '~icons/lucide/eraser'
 import LucideLoaderCircle from '~icons/lucide/loader-circle'
 import NextAISuggestionList, { type SuggestionItem } from './NextAISuggestionList.vue'
+import NextAIPresentation from './NextAIPresentation.vue'
 import {
   getCommandCatalog,
   getRunHistory,
@@ -370,6 +394,8 @@ const attachments = ref<any[]>([])
 const error = ref('')
 const gatewayConfigError = ref(false)
 const catalog = ref<any>(null)
+const catalogLoading = ref(false)
+const catalogError = ref('')
 const currentRun = ref<string>('')
 const promptText = ref(props.initialPrompt || '')
 const activeAgentId = ref<string | null>(null)
@@ -392,6 +418,18 @@ const emptyStateTitle = computed(() => {
   if (/helpdesk/i.test(props.surface)) return 'What do you want to work on?'
   return 'What do you want Muster to do?'
 })
+const quickActions = computed(() => {
+  const preferred = ['my-tickets', 'unassigned', 'reports', 'tokens']
+  const items = normalizeCommands(catalog.value?.commands)
+  return preferred
+    .map((name) => items.find((item) => item.token === '/' + name))
+    .filter(Boolean)
+    .slice(0, 4) as SuggestionItem[]
+})
+const suggestionEmptyLabel = computed(() => {
+  if (catalogError.value) return 'Commands are temporarily unavailable'
+  return suggestionState.value.type === '@' ? 'No matching agents' : 'No matching commands'
+})
 
 // -----------------------------------------------------------------------
 // Conversation history (FIX C, 2026-05-26)
@@ -413,6 +451,7 @@ type ChatMessage = {
   content: string
   status?: 'streaming' | 'done' | 'error'
   runName?: string
+  presentation?: any
 }
 
 const messages = ref<ChatMessage[]>([])
@@ -585,11 +624,13 @@ const suggestionFloatStyle = ref<Record<string, string>>({
 function recomputeSuggestionFloat() {
   const rect = suggestionState.value.clientRect ? suggestionState.value.clientRect() : null
   if (!rect) return
+  const hostRect = promptHostRef.value?.getBoundingClientRect?.()
   const menuEl = suggestionListRef.value?.$el as HTMLElement | undefined
   const menuRect = menuEl?.getBoundingClientRect?.()
   const menuHeight = menuRect?.height || 240 // fallback estimate
-  const menuWidth = menuRect?.width || 320
   const margin = 16
+  const availableWidth = Math.max(280, window.innerWidth - margin * 2)
+  const menuWidth = Math.min(560, availableWidth, Math.max(320, hostRect?.width || menuRect?.width || 320))
 
   const spaceBelow = window.innerHeight - rect.bottom - margin
   const spaceAbove = rect.top - margin
@@ -600,7 +641,7 @@ function recomputeSuggestionFloat() {
   // Clamp vertically to viewport.
   top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
 
-  let left = rect.left
+  let left = hostRect?.left ?? rect.left
   // Clamp horizontally so the menu never extends past the right edge.
   const maxLeft = window.innerWidth - menuWidth - margin
   if (maxLeft > 0 && left > maxLeft) left = maxLeft
@@ -610,6 +651,7 @@ function recomputeSuggestionFloat() {
     position: 'fixed',
     top: `${top}px`,
     left: `${left}px`,
+    width: menuWidth + 'px',
     zIndex: '100',
     pointerEvents: 'none',
   }
@@ -697,7 +739,7 @@ function initEditor() {
     editorProps: {
       handleKeyDown: (_view, event) => {
         if (suggestionState.value.open && suggestionListRef.value) {
-          if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab'].includes(event.key)) {
+          if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Enter', 'Tab'].includes(event.key)) {
             const handled = suggestionListRef.value.onKeyDown(event)
             if (handled) {
               event.preventDefault()
@@ -802,15 +844,15 @@ function onSuggestionPick(item: SuggestionItem) {
 function buildItems(char: '/' | '@', query: string): SuggestionItem[] {
   const q = (query || '').toLowerCase()
   if (char === '/') {
-    const items = normalizeCommands(catalog.value?.commands)
+    const items = normalizeCommands(catalog.value?.commands).sort(commandSuggestionSort)
     return items
       .filter((it) => safeText(it.token).toLowerCase().includes(q) || safeText(it.hint).toLowerCase().includes(q))
-      .slice(0, 25)
+      .slice(0, 80)
   }
   const personas = normalizePersonas(catalog.value?.personas)
   return personas
     .filter((it) => safeText(it.token).toLowerCase().includes(q) || safeText(it.hint).toLowerCase().includes(q))
-    .slice(0, 25)
+    .slice(0, 40)
 }
 
 function safeText(value: any): string {
@@ -855,6 +897,19 @@ function commandGroup(command: any): string {
   return 'Commands'
 }
 
+function commandSuggestionSort(left: SuggestionItem, right: SuggestionItem): number {
+  const order: Record<string, number> = {
+    'This page': 0,
+    'Muster controls': 1,
+    'Configured workflows': 2,
+    'Muster tools': 3,
+    Configured: 4,
+    Commands: 5,
+  }
+  const groupDelta = (order[left.group || 'Commands'] ?? 9) - (order[right.group || 'Commands'] ?? 9)
+  return groupDelta || left.token.localeCompare(right.token)
+}
+
 function normalizePersonas(personas: any): SuggestionItem[] {
   return Object.entries(personas || {}).map(([key, persona]: [string, any]) => ({
     token: `@${String(key).replace(/^@/, '')}`,
@@ -873,6 +928,8 @@ function personaGroup(persona: any): string {
 }
 
 async function loadCatalog() {
+  catalogLoading.value = true
+  catalogError.value = ''
   try {
     const result = await getCommandCatalog({
       source_doctype: props.referenceDoctype,
@@ -882,9 +939,12 @@ async function loadCatalog() {
     catalog.value = result
   } catch (err: any) {
     catalog.value = null
+    catalogError.value = err?.messages?.[0] || err?.message || 'Could not load commands.'
     if (isGatewayConfigError(err)) {
       gatewayConfigError.value = true
     }
+  } finally {
+    catalogLoading.value = false
   }
 }
 
@@ -920,6 +980,7 @@ async function loadHistory() {
           content: answer,
           status: turn.error ? 'error' : 'done',
           runName: turn.run,
+          presentation: turn.presentation || undefined,
         })
       }
     }
@@ -1058,6 +1119,7 @@ async function submit() {
     messages.value[idx].content =
       typeof draft === 'string' ? draft : JSON.stringify(draft, null, 2)
     messages.value[idx].status = 'done'
+    messages.value[idx].presentation = runResp?.proposal?.presentation || undefined
     state.thinkingLine.value = 'Ready for review.'
     clearPrompt()
     scrollThreadToBottom()
@@ -1071,6 +1133,16 @@ async function submit() {
 
   // 3. Clear the input so the user can type the next turn.
   clearPrompt()
+}
+
+async function runCommand(command: string) {
+  const value = String(command || '').trim()
+  if (!value || state.running.value || !editor.value) return
+  closeSuggestion()
+  editor.value.commands.setContent(`<p>${escapeHtml(value)}</p>`)
+  promptText.value = value
+  await nextTick()
+  await submit()
 }
 
 async function onStop() {
@@ -1340,6 +1412,52 @@ watch(
   align-items: center;
   justify-content: center;
 }
+.oc-quick-actions {
+  display: grid;
+  width: min(100%, 34rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+  text-align: left;
+}
+.oc-quick-actions button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.15rem 0.5rem;
+  border: 1px solid var(--surface-gray-3, #e5e7eb);
+  border-radius: 8px;
+  background: var(--surface-white, #ffffff);
+  padding: 0.65rem 0.75rem;
+  color: var(--ink-gray-8, #1f2937);
+}
+.oc-quick-actions button:hover {
+  border-color: #5eead4;
+  background: #f0fdfa;
+}
+.oc-quick-actions button span {
+  overflow: hidden;
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-quick-actions button small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-gray-5, #6b7280);
+  font-size: 0.65rem;
+  line-height: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-quick-actions button svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--ink-gray-5, #6b7280);
+}
 @media (max-width: 640px) {
   .oc-drawer-shell {
     left: 0;
@@ -1348,6 +1466,9 @@ watch(
     bottom: 0;
     width: 100%;
     border-radius: 0;
+  }
+  .oc-quick-actions {
+    grid-template-columns: 1fr;
   }
 }
 .oc-drawer-enter-active,
