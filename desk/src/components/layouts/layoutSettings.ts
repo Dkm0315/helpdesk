@@ -22,7 +22,7 @@ export const agentPortalSidebarOptions = [
     to: "NextAIWorkspace",
   },
   {
-    label: __("CTO Workspace"),
+    label: __("Muster Governance"),
     icon: LucideShieldCheck,
     to: "OpenClawCTOWorkspace",
     requiredRoles: [

@@ -98,7 +98,7 @@
             v-model="template.affected_components_text"
             label="Affected Components (comma-separated)"
             type="text"
-            placeholder="helpdesk, openclaw-gateway, etc."
+            placeholder="helpdesk, muster-gateway, etc."
           />
 
           <div class="grid grid-cols-2 gap-3">

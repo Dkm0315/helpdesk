@@ -3,9 +3,9 @@
     <div class="border-b bg-white px-6 py-4">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h1 class="text-xl font-semibold text-ink-gray-9">CTO Workspace</h1>
+          <h1 class="text-xl font-semibold text-ink-gray-9">Muster Governance</h1>
           <p class="mt-1 text-sm leading-6 text-ink-gray-5">
-            Customer environments, support-hour risk, handoffs, and review-only air-gap command packs.
+            Customer environments, support-hour risk, governed handoffs, and review-only infrastructure plans.
           </p>
         </div>
         <Button label="Refresh" @click="dashboard.reload()" />
@@ -14,7 +14,7 @@
 
     <div class="space-y-5 p-6">
       <ErrorMessage v-if="dashboard.error" :message="dashboard.error.messages?.[0] || dashboard.error.message" />
-      <div v-if="dashboard.loading" class="rounded-2xl border bg-white p-6 text-sm text-ink-gray-5">Loading CTO context...</div>
+      <div v-if="dashboard.loading" class="rounded-2xl border bg-white p-6 text-sm text-ink-gray-5">Loading governance context...</div>
 
       <div v-else class="grid gap-4 md:grid-cols-4">
         <div v-for="card in cards" :key="card.label" class="rounded-2xl border bg-white p-4 shadow-sm">
@@ -193,5 +193,5 @@ function generateCommands() {
   commands.submit()
 }
 
-usePageMeta(() => ({ title: 'CTO Workspace' }))
+usePageMeta(() => ({ title: 'Muster Governance' }))
 </script>

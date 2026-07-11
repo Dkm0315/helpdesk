@@ -43,18 +43,19 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: #0f766e;
   color: white;
   border: none;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35),
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.28),
     0 2px 4px rgba(0, 0, 0, 0.1);
   transition: transform 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 160ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .oc-launcher:hover {
   transform: translateY(-1px) scale(1.04);
-  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.45),
+  background: #115e59;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.36),
     0 2px 4px rgba(0, 0, 0, 0.12);
 }
 .oc-launcher:active {

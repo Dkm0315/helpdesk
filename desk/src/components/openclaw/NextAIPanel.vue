@@ -61,6 +61,53 @@
         <a href="/app/openclaw-ai-settings" class="underline" target="_blank" rel="noopener">Open integration settings</a>.
       </div>
 
+      <section
+        v-if="isWorkspace && controlTabs.length"
+        class="oc-control-center"
+        data-testid="muster-control-center"
+        aria-label="Muster controls"
+      >
+        <div class="oc-control-center-header">
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-ink-gray-8">Muster controls</div>
+            <div class="truncate text-[11px] text-ink-gray-5">{{ controlCenterSummary }}</div>
+          </div>
+          <span class="oc-access-badge">{{ accessTierLabel }}</span>
+        </div>
+        <div class="oc-control-tabs" role="tablist" aria-label="Control group">
+          <button
+            v-for="tab in controlTabs"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            :aria-selected="activeControlGroup === tab.id"
+            :class="{ 'is-active': activeControlGroup === tab.id }"
+            @click="selectControlGroup(tab.id)"
+          >
+            <component :is="tab.icon" class="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{{ tab.label }}</span>
+            <small>{{ tab.actions.length }}</small>
+          </button>
+        </div>
+        <div class="oc-control-actions" role="tabpanel">
+          <button
+            v-for="action in activeControlActions"
+            :key="action.token"
+            type="button"
+            :title="action.hint"
+            :disabled="state.running.value"
+            @click="runCommand(action.token)"
+          >
+            <component :is="activeControlIcon" class="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span class="min-w-0">
+              <strong>{{ action.label || humanize(action.token) }}</strong>
+              <small>{{ action.token }}</small>
+            </span>
+            <LucideArrowRight class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+
       <!-- Conversation thread (chat-like, both user + assistant turns) -->
       <div
         v-if="messages.length"
@@ -206,7 +253,7 @@
           <Sparkles class="h-4 w-4 text-ink-gray-7" />
         </div>
         <div class="text-sm font-medium text-ink-gray-8">{{ emptyStateTitle }}</div>
-        <div v-if="quickActions.length" class="oc-quick-actions">
+        <div v-if="quickActions.length && !isWorkspace" class="oc-quick-actions">
           <button
             v-for="action in quickActions"
             :key="action.token"
@@ -347,6 +394,9 @@ import LucidePaperclip from '~icons/lucide/paperclip'
 import LucideSend from '~icons/lucide/send'
 import LucideEraser from '~icons/lucide/eraser'
 import LucideLoaderCircle from '~icons/lucide/loader-circle'
+import LucideUserRound from '~icons/lucide/user-round'
+import LucideShieldCheck from '~icons/lucide/shield-check'
+import LucideWorkflow from '~icons/lucide/workflow'
 import NextAISuggestionList, { type SuggestionItem } from './NextAISuggestionList.vue'
 import NextAIPresentation from './NextAIPresentation.vue'
 import {
@@ -409,6 +459,73 @@ const { state, start, stop, steer, modify, cleanup } = useStreamingRun()
 const isWorkspace = computed(() => props.layout === 'workspace')
 const canInsert = computed(() => !isWorkspace.value && Boolean(props.getParentEditor || props.onInsert))
 const selectedAgentId = computed(() => inferPersona(promptText.value) || activeAgentId.value)
+type ControlGroupId = 'personal' | 'governance' | 'runtime'
+type ControlTab = {
+  id: ControlGroupId
+  label: string
+  icon: any
+  commandNames: string[]
+  actions: SuggestionItem[]
+}
+const activeControlGroup = ref<ControlGroupId>('personal')
+const controlGroupTouched = ref(false)
+const controlGroupDefinitions: Array<Omit<ControlTab, 'actions'>> = [
+  {
+    id: 'personal',
+    label: 'Personal',
+    icon: LucideUserRound,
+    commandNames: ['my-tickets', 'unassigned', 'open-tickets', 'tokens', 'usage', 'memory', 'sessions', 'artifacts'],
+  },
+  {
+    id: 'governance',
+    label: 'Governance',
+    icon: LucideShieldCheck,
+    commandNames: [
+      'reports', 'limits', 'audit', 'security', 'evals', 'approvals', 'incidents',
+      'change-scan', 'test-plan', 'validate', 'validation-status', 'release-evidence',
+      'documentation-status', 'documentation-impact', 'documentation-update', 'runbooks',
+    ],
+  },
+  {
+    id: 'runtime',
+    label: 'Runtime',
+    icon: LucideWorkflow,
+    commandNames: ['status', 'providers', 'models', 'tools', 'skills', 'plugins', 'mcp', 'channels', 'agents', 'settings'],
+  },
+]
+const accessTier = computed(() => String(catalog.value?.context?.access_tier || 'user'))
+const isGovernanceUser = computed(() => ['permission_manager', 'admin'].includes(accessTier.value))
+const controlTabs = computed<ControlTab[]>(() => {
+  const commands = normalizeCommands(catalog.value?.commands)
+  return controlGroupDefinitions
+    .filter((group) => group.id !== 'governance' || isGovernanceUser.value)
+    .map((group) => ({
+      ...group,
+      actions: group.commandNames
+        .map((name) => commands.find((command) => command.token === `/${name}`))
+        .filter(Boolean) as SuggestionItem[],
+    }))
+    .filter((group) => group.actions.length)
+})
+const activeControlTab = computed(() =>
+  controlTabs.value.find((tab) => tab.id === activeControlGroup.value) || controlTabs.value[0],
+)
+const activeControlActions = computed(() => activeControlTab.value?.actions || [])
+const activeControlIcon = computed(() => activeControlTab.value?.icon || LucideWorkflow)
+const accessTierLabel = computed(() => {
+  const labels: Record<string, string> = {
+    permission_manager: 'Permission manager',
+    admin: 'Administrator',
+    power_user: 'Power user',
+    user: 'Personal',
+  }
+  return labels[accessTier.value] || 'Personal'
+})
+const controlCenterSummary = computed(() => {
+  if (activeControlGroup.value === 'governance') return 'Usage, limits, audit, security, evals, validation, and documentation'
+  if (activeControlGroup.value === 'runtime') return 'Providers, models, tools, extensions, channels, and agents'
+  return 'Your tickets, token ledger, memory, sessions, and artifacts'
+})
 const contextLine = computed(() => {
   const context = props.contextLabel || referenceLabel.value || 'Agent workspace'
   return selectedAgentId.value ? `@${selectedAgentId.value} · ${context}` : context
@@ -426,6 +543,11 @@ const quickActions = computed(() => {
     .filter(Boolean)
     .slice(0, 4) as SuggestionItem[]
 })
+
+function selectControlGroup(group: ControlGroupId) {
+  controlGroupTouched.value = true
+  activeControlGroup.value = group
+}
 const suggestionEmptyLabel = computed(() => {
   if (catalogError.value) return 'Commands are temporarily unavailable'
   return suggestionState.value.type === '@' ? 'No matching agents' : 'No matching commands'
@@ -877,6 +999,7 @@ function normalizeCommands(commands: any): SuggestionItem[] {
       if (!slug) return null
       return {
         token: `/${slug}`,
+        label: safeText(command?.label || command?.display_name || name.replace(/[-_]/g, ' ')),
         hint: safeText(command?.description || command?.label || command?.display_name || 'Muster command'),
         group: commandGroup(command),
         payload: command,
@@ -937,6 +1060,11 @@ async function loadCatalog() {
       surface: props.surface,
     })
     catalog.value = result
+    if (!controlGroupTouched.value) {
+      activeControlGroup.value = ['permission_manager', 'admin'].includes(String(result?.context?.access_tier || ''))
+        ? 'governance'
+        : 'personal'
+    }
   } catch (err: any) {
     catalog.value = null
     catalogError.value = err?.messages?.[0] || err?.message || 'Could not load commands.'
@@ -1276,8 +1404,8 @@ watch(
 }
 .oc-prompt-editor :deep(.oc-slash),
 .oc-prompt-editor :deep(.oc-agent) {
-  background: rgba(99, 102, 241, 0.08);
-  color: #4338ca;
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f766e;
   padding: 0 4px;
   border-radius: 4px;
   font-weight: 500;
@@ -1404,6 +1532,125 @@ watch(
   flex-direction: column;
   overflow: hidden;
 }
+.oc-control-center {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--surface-gray-3, #e5e7eb);
+  background: var(--surface-white, #ffffff);
+}
+.oc-control-center-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem 0.5rem;
+}
+.oc-access-badge {
+  flex: 0 0 auto;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  background: #f0fdfa;
+  padding: 0.2rem 0.5rem;
+  color: #115e59;
+  font-size: 0.65rem;
+  font-weight: 650;
+}
+.oc-control-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding: 0 0.75rem 0.5rem;
+  scrollbar-width: thin;
+}
+.oc-control-tabs button {
+  display: inline-flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
+  color: var(--ink-gray-6, #4b5563);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.oc-control-tabs button:hover {
+  background: var(--surface-gray-1, #f9fafb);
+  color: var(--ink-gray-9, #111827);
+}
+.oc-control-tabs button.is-active {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #115e59;
+}
+.oc-control-tabs button small {
+  min-width: 1.1rem;
+  border-radius: 999px;
+  background: var(--surface-gray-2, #f3f4f6);
+  padding: 0.05rem 0.3rem;
+  text-align: center;
+  color: var(--ink-gray-5, #6b7280);
+  font-size: 0.62rem;
+}
+.oc-control-tabs button.is-active small {
+  background: #ccfbf1;
+  color: #115e59;
+}
+.oc-control-actions {
+  display: grid;
+  max-height: 10rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow-y: auto;
+  border-top: 1px solid var(--surface-gray-2, #f3f4f6);
+  background: var(--surface-gray-1, #f9fafb);
+  scrollbar-gutter: stable;
+}
+.oc-control-actions button {
+  display: grid;
+  min-width: 0;
+  min-height: 3.1rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  border-right: 1px solid var(--surface-gray-2, #f3f4f6);
+  border-bottom: 1px solid var(--surface-gray-2, #f3f4f6);
+  padding: 0.55rem 0.65rem;
+  color: var(--ink-gray-6, #4b5563);
+  text-align: left;
+}
+.oc-control-actions button:hover:not(:disabled) {
+  background: #ecfeff;
+  color: #0f766e;
+}
+.oc-control-actions button:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: -2px;
+}
+.oc-control-actions button:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+.oc-control-actions button strong,
+.oc-control-actions button small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-control-actions button strong {
+  color: var(--ink-gray-8, #1f2937);
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1rem;
+}
+.oc-control-actions button small {
+  color: var(--ink-gray-5, #6b7280);
+  font-size: 0.62rem;
+  line-height: 0.85rem;
+}
+.oc-control-actions button:hover:not(:disabled) strong,
+.oc-control-actions button:hover:not(:disabled) small {
+  color: #115e59;
+}
 .oc-empty-state {
   display: flex;
   flex: 1 1 auto;
@@ -1469,6 +1716,15 @@ watch(
   }
   .oc-quick-actions {
     grid-template-columns: 1fr;
+  }
+  .oc-control-actions {
+    max-height: 11rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .oc-control-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 .oc-drawer-enter-active,
