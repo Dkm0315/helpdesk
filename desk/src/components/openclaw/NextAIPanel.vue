@@ -1,7 +1,11 @@
 <template>
-  <Teleport to="body">
-    <transition name="oc-drawer">
-      <div v-if="open" class="oc-drawer-shell">
+  <Teleport to="body" :disabled="isWorkspace">
+    <transition :name="isWorkspace ? '' : 'oc-drawer'">
+      <section
+        v-if="open"
+        :class="isWorkspace ? 'oc-workspace-shell' : 'oc-drawer-shell'"
+        aria-label="Muster assistant"
+      >
         <!-- Header -->
         <div class="oc-drawer-header flex items-start justify-between gap-3 border-b px-4 py-2.5">
           <div class="min-w-0 flex items-center gap-2">
@@ -10,17 +14,22 @@
             </div>
             <div class="min-w-0">
               <div class="truncate text-sm font-semibold text-ink-gray-9">
-                NextAI
-                <span v-if="referenceLabel" class="ml-1 font-normal text-ink-gray-6">
+                Muster
+                <span v-if="referenceLabel && !isWorkspace" class="ml-1 font-normal text-ink-gray-6">
                   · {{ referenceLabel }}
                 </span>
               </div>
-              <div class="truncate text-[11px] text-ink-gray-5">
-                Type <span class="font-medium text-ink-gray-7">/</span> for commands, <span class="font-medium text-ink-gray-7">@</span> for agents.
-              </div>
+              <div class="truncate text-[11px] text-ink-gray-5">{{ contextLine }}</div>
             </div>
           </div>
           <div class="flex items-center gap-1">
+            <span class="mr-1 inline-flex items-center gap-1.5 rounded-full border bg-surface-gray-1 px-2 py-1 text-[11px] text-ink-gray-6">
+              <span
+                class="h-1.5 w-1.5 rounded-full"
+                :class="state.running.value ? 'animate-pulse bg-amber-500' : 'bg-green-500'"
+              />
+              {{ state.running.value ? 'Working' : 'Ready' }}
+            </span>
             <button
               v-if="messages.length"
               type="button"
@@ -31,8 +40,9 @@
               Clear
             </button>
             <button
+              v-if="!isWorkspace"
               type="button"
-              aria-label="Close NextAI"
+              aria-label="Close Muster"
               class="rounded-md p-1 text-ink-gray-5 hover:bg-surface-gray-1"
               @click="emit('update:open', false)"
             >
@@ -43,16 +53,22 @@
 
         <!-- Scrollable body so the drawer's internal content scrolls while
              the host page stays interactive. -->
-        <div class="oc-drawer-body flex-1 overflow-y-auto">
+        <div class="oc-assistant-body flex min-h-0 flex-1 flex-col">
 
       <!-- Gateway-not-configured banner -->
       <div v-if="gatewayConfigError" class="m-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-        OpenClaw gateway is not configured for this site.
-        <a href="/app/openclaw-ai-settings" class="underline" target="_blank" rel="noopener">Open Site Config</a>.
+        Muster is not connected for this site.
+        <a href="/app/openclaw-ai-settings" class="underline" target="_blank" rel="noopener">Open integration settings</a>.
       </div>
 
       <!-- Conversation thread (chat-like, both user + assistant turns) -->
-      <div v-if="messages.length" ref="threadRef" class="oc-thread flex flex-col gap-3 px-3 py-3 border-b">
+      <div
+        v-if="messages.length"
+        ref="threadRef"
+        class="oc-thread flex min-h-0 flex-col gap-3 px-3 py-3"
+        role="log"
+        aria-live="polite"
+      >
         <template v-for="(msg, idx) in messages" :key="msg.id">
           <!-- User bubble (right-aligned, primary background) -->
           <div v-if="msg.role === 'user'" class="flex justify-end">
@@ -129,7 +145,7 @@
             </template>
 
             <!-- Insert into composer (only for the latest done assistant bubble) -->
-            <div v-if="msg.status === 'done' && msg.content && isLastAssistant(idx)" class="mt-1 flex gap-2 pl-1">
+            <div v-if="canInsert && msg.status === 'done' && msg.content && isLastAssistant(idx)" class="mt-1 flex gap-2 pl-1">
               <button type="button" class="rounded-md border px-2 py-1 text-[11px] hover:bg-surface-gray-1" @click="insertMessageIntoComposer(msg)">Insert into editor</button>
             </div>
           </div>
@@ -178,12 +194,11 @@
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="!gatewayConfigError" class="m-3 rounded-2xl border border-dashed bg-surface-gray-1 px-4 py-5 text-center">
+      <div v-else-if="!gatewayConfigError" class="oc-empty-state m-3 rounded-xl border border-dashed bg-surface-gray-1 px-4 py-5 text-center">
         <div class="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-white">
           <Sparkles class="h-4 w-4 text-ink-gray-7" />
         </div>
-        <div class="text-sm font-medium text-ink-gray-8">Ask NextAI anything about this ticket.</div>
-        <div class="mt-1 text-xs text-ink-gray-5">Try <span class="font-medium text-ink-gray-7">/summarize</span> or <span class="font-medium text-ink-gray-7">@architect</span> to get started.</div>
+        <div class="text-sm font-medium text-ink-gray-8">{{ emptyStateTitle }}</div>
       </div>
 
       <div v-if="error && !messages.some(m => m.role === 'system')" class="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -191,12 +206,16 @@
       </div>
 
       <!-- Prompt composer -->
-      <div class="px-3 py-2">
-        <div ref="promptHostRef" class="oc-prompt-host relative">
-          <EditorContent v-if="editor" :editor="editor" class="oc-prompt-editor prose-sm max-w-none min-h-[2.25rem] max-h-[14vh] overflow-y-auto" />
-          <div v-else class="px-2 py-2 text-xs text-ink-gray-5">Loading composer...</div>
-
-        </div>
+      <div class="oc-composer-shell bg-white px-3 pb-3 pt-2">
+        <div class="oc-composer-frame">
+          <div ref="promptHostRef" class="oc-prompt-host relative">
+            <EditorContent
+              v-if="editor"
+              :editor="editor"
+              class="oc-prompt-editor prose-sm max-w-none min-h-[3.25rem] max-h-[24vh] overflow-y-auto"
+            />
+            <div v-else class="px-3 py-3 text-xs text-ink-gray-5">Loading composer...</div>
+          </div>
         <Teleport to="body">
           <div
             v-show="suggestionState.open"
@@ -213,21 +232,28 @@
           </div>
         </Teleport>
 
-        <!-- Attachment chips -->
-        <div v-if="attachments.length" class="mt-2 flex flex-wrap gap-1.5">
-          <span
-            v-for="att in attachments"
-            :key="att.file_url || att.name"
-            class="inline-flex items-center gap-1 rounded-full bg-surface-gray-2 px-2 py-1 text-xs text-ink-gray-7"
-          >
-            <LucidePaperclip class="h-3 w-3" />
-            {{ att.file_name || att.name }}
-            <button class="ml-1 text-ink-gray-5 hover:text-red-500" @click="removeAttachment(att)">×</button>
-          </span>
-        </div>
+          <!-- Attachment chips -->
+          <div v-if="attachments.length" class="oc-attachment-row flex flex-wrap gap-1.5 px-2.5 pb-1.5">
+            <span
+              v-for="att in attachments"
+              :key="att.file_url || att.name"
+              class="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-surface-gray-2 px-2 py-1 text-xs text-ink-gray-7"
+            >
+              <LucidePaperclip class="h-3 w-3 shrink-0" />
+              <span class="truncate">{{ att.file_name || att.name }}</span>
+              <button
+                type="button"
+                class="ml-1 shrink-0 text-ink-gray-5 hover:text-red-500"
+                :aria-label="`Remove ${att.file_name || att.name}`"
+                @click="removeAttachment(att)"
+              >
+                <LucideX class="h-3 w-3" />
+              </button>
+            </span>
+          </div>
 
-        <div class="mt-1 flex items-center justify-between">
-          <div class="flex items-center gap-2">
+          <div class="oc-composer-toolbar flex items-center justify-between border-t px-2 py-1.5">
+            <div class="flex items-center gap-1">
             <FileUploader
               :upload-args="{ doctype: referenceDoctype || 'User', docname: referenceName || 'Administrator', private: true }"
               @success="(file) => attachments.push(file)"
@@ -235,31 +261,46 @@
               <template #default="{ openFileSelector, uploading }">
                 <button
                   type="button"
-                  class="rounded-md px-2 py-1 text-xs font-medium text-ink-gray-6 hover:bg-surface-gray-1"
+                  class="oc-icon-button"
                   :disabled="uploading"
+                  :aria-label="uploading ? 'Uploading attachment' : 'Attach a file'"
+                  :title="uploading ? 'Uploading attachment' : 'Attach a file'"
                   @click="openFileSelector()"
                 >
-                  {{ uploading ? 'Uploading...' : 'Attach' }}
+                  <LucideLoaderCircle v-if="uploading" class="h-4 w-4 animate-spin" />
+                  <LucidePaperclip v-else class="h-4 w-4" />
                 </button>
               </template>
             </FileUploader>
-            <span class="text-[11px] text-ink-gray-5">/ commands, @ agents. Enter to send, Shift+Enter newline.</span>
           </div>
-          <div class="flex gap-2">
-            <button type="button" class="rounded-md border px-2.5 py-1 text-xs hover:bg-surface-gray-1" @click="clearPrompt">Clear</button>
+            <div class="flex items-center gap-1">
+            <button
+              v-if="promptText || attachments.length"
+              type="button"
+              class="oc-icon-button"
+              aria-label="Clear prompt"
+              title="Clear prompt"
+              @click="clearPrompt"
+            >
+              <LucideEraser class="h-4 w-4" />
+            </button>
             <button
               type="button"
-              class="rounded-md bg-ink-gray-8 px-2.5 py-1 text-xs text-white hover:bg-ink-gray-9 disabled:opacity-50"
+              class="oc-send-button"
               :disabled="!canSend"
+              :aria-label="state.running.value ? 'Muster is working' : 'Send message'"
+              :title="state.running.value ? 'Muster is working' : 'Send message'"
               @click="submit"
             >
-              {{ state.running.value ? 'Working...' : 'Send' }}
+              <LucideLoaderCircle v-if="state.running.value" class="h-4 w-4 animate-spin" />
+              <LucideSend v-else class="h-4 w-4" />
             </button>
+          </div>
           </div>
         </div>
       </div>
         </div>
-      </div>
+      </section>
     </transition>
   </Teleport>
 </template>
@@ -280,6 +321,9 @@ import Sparkles from '~icons/lucide/sparkles'
 import LucideX from '~icons/lucide/x'
 import LucideWrench from '~icons/lucide/wrench'
 import LucidePaperclip from '~icons/lucide/paperclip'
+import LucideSend from '~icons/lucide/send'
+import LucideEraser from '~icons/lucide/eraser'
+import LucideLoaderCircle from '~icons/lucide/loader-circle'
 import NextAISuggestionList, { type SuggestionItem } from './NextAISuggestionList.vue'
 import {
   getCommandCatalog,
@@ -300,9 +344,11 @@ type ParentEditor = {
   isEmpty?: boolean
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   surface: string
+  layout?: 'drawer' | 'workspace'
+  contextLabel?: string
   referenceDoctype?: string
   referenceName?: string
   /** A function returning the parent editor instance to insert AI output into. */
@@ -311,7 +357,9 @@ const props = defineProps<{
   onInsert?: (text: string) => void
   /** Initial prompt seed (optional). */
   initialPrompt?: string
-}>()
+}>(), {
+  layout: 'drawer',
+})
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -323,6 +371,8 @@ const error = ref('')
 const gatewayConfigError = ref(false)
 const catalog = ref<any>(null)
 const currentRun = ref<string>('')
+const promptText = ref(props.initialPrompt || '')
+const activeAgentId = ref<string | null>(null)
 
 const steerOpen = ref(false)
 const modifyOpen = ref(false)
@@ -330,6 +380,18 @@ const steerText = ref('')
 const modifyText = ref('')
 
 const { state, start, stop, steer, modify, cleanup } = useStreamingRun()
+const isWorkspace = computed(() => props.layout === 'workspace')
+const canInsert = computed(() => !isWorkspace.value && Boolean(props.getParentEditor || props.onInsert))
+const selectedAgentId = computed(() => inferPersona(promptText.value) || activeAgentId.value)
+const contextLine = computed(() => {
+  const context = props.contextLabel || referenceLabel.value || 'Agent workspace'
+  return selectedAgentId.value ? `@${selectedAgentId.value} · ${context}` : context
+})
+const emptyStateTitle = computed(() => {
+  if (/ticket/i.test(props.surface)) return 'What should Muster do with this ticket?'
+  if (/helpdesk/i.test(props.surface)) return 'What do you want to work on?'
+  return 'What do you want Muster to do?'
+})
 
 // -----------------------------------------------------------------------
 // Conversation history (FIX C, 2026-05-26)
@@ -407,6 +469,7 @@ function clearConversation() {
   state.elapsedSec.value = 0
   state.error.value = ''
   messages.value = []
+  activeAgentId.value = null
 }
 
 // Bridge: every time a token arrives, append it to the last streaming
@@ -468,13 +531,17 @@ watch(
   },
 )
 
-// When the drawer's source reference changes (user opened a different
-// ticket), drop the in-flight stream and clear the conversation.
+// When the drawer opens or the source reference changes, re-attach to the
+// persisted OpenClaw thread for that ticket. Gameplan already does this; the
+// Helpdesk drawer is mounted while closed, so mount-time history loading alone
+// misses the first user-visible open.
 watch(
-  () => [props.referenceDoctype, props.referenceName, props.surface],
-  ([newDt, newName, newSurface], [oldDt, oldName, oldSurface]) => {
-    if (newDt === oldDt && newName === oldName && newSurface === oldSurface) return
-    clearConversation()
+  () => [props.open, props.referenceDoctype, props.referenceName, props.surface],
+  ([isOpen, newDt, newName, newSurface], [_oldOpen, oldDt, oldName, oldSurface]) => {
+    if (!isOpen) return
+    if (newDt !== oldDt || newName !== oldName || newSurface !== oldSurface) {
+      clearConversation()
+    }
     loadCatalog()
     loadHistory()
   },
@@ -650,6 +717,9 @@ function initEditor() {
         return false
       },
     },
+    onUpdate: ({ editor: currentEditor }) => {
+      promptText.value = currentEditor.getText()
+    },
   })
 }
 
@@ -672,7 +742,8 @@ function buildMentionExtension(char: '/' | '@') {
             query: cmdProps.query || '',
             items: buildItems(char, cmdProps.query || ''),
             command: (item) => {
-              cmdProps.command({ id: item.token, label: item.token })
+              const token = item.token.replace(/^[/@]/, '')
+              cmdProps.command({ id: token, label: token })
               closeSuggestion()
             },
             clientRect: cmdProps.clientRect,
@@ -685,7 +756,8 @@ function buildMentionExtension(char: '/' | '@') {
             query: cmdProps.query || '',
             items: buildItems(char, cmdProps.query || ''),
             command: (item) => {
-              cmdProps.command({ id: item.token, label: item.token })
+              const token = item.token.replace(/^[/@]/, '')
+              cmdProps.command({ id: token, label: token })
               closeSuggestion()
             },
             clientRect: cmdProps.clientRect,
@@ -763,7 +835,7 @@ function normalizeCommands(commands: any): SuggestionItem[] {
       if (!slug) return null
       return {
         token: `/${slug}`,
-        hint: safeText(command?.description || command?.label || command?.display_name || 'OpenClaw command'),
+        hint: safeText(command?.description || command?.label || command?.display_name || 'Muster command'),
         group: commandGroup(command),
         payload: command,
       } as SuggestionItem
@@ -775,7 +847,7 @@ function commandGroup(command: any): string {
   if (command?.primary) return 'This page'
   const source = String(command?.source || '')
   if (source.includes('codex') || source.includes('gateway') || source.includes('tool')) {
-    return 'More OpenClaw / Codex'
+    return 'Muster tools'
   }
   if (source.includes('doctype')) return 'Configured'
   return 'Commands'
@@ -784,7 +856,7 @@ function commandGroup(command: any): string {
 function normalizePersonas(personas: any): SuggestionItem[] {
   return Object.entries(personas || {}).map(([key, persona]: [string, any]) => ({
     token: `@${String(key).replace(/^@/, '')}`,
-    hint: safeText(persona?.description || persona?.label || 'OpenClaw specialist'),
+    hint: safeText(persona?.description || persona?.label || 'Muster specialist'),
     group: personaGroup(persona),
     payload: persona,
   })) as SuggestionItem[]
@@ -793,7 +865,7 @@ function normalizePersonas(personas: any): SuggestionItem[] {
 function personaGroup(persona: any): string {
   if (persona?.primary) return 'This page'
   const source = String(persona?.source || '')
-  if (source.includes('codex') || source.includes('gateway')) return 'More OpenClaw / Codex'
+  if (source.includes('codex') || source.includes('gateway')) return 'Muster agents'
   if (source.includes('doctype')) return 'Configured agents'
   return 'Agents'
 }
@@ -851,6 +923,9 @@ async function loadHistory() {
     }
     if (restored.length && !messages.value.length) {
       messages.value = restored
+      activeAgentId.value = [...(result?.turns || [])]
+        .reverse()
+        .find((turn: any) => turn?.persona)?.persona || null
       scrollThreadToBottom()
     }
   } catch {
@@ -865,6 +940,8 @@ function isGatewayConfigError(err: any): boolean {
 
 function clearPrompt() {
   editor.value?.commands.clearContent(true)
+  promptText.value = ''
+  attachments.value = []
 }
 
 function discardOutput() {
@@ -894,12 +971,14 @@ function inferIntent(text: string): string {
 }
 
 function inferPersona(text: string): string | null {
-  return text.match(/@([a-z0-9][a-z0-9-]*)/i)?.[1]?.replace(/-/g, '_') || null
+  return text.match(/@([a-z0-9][a-z0-9-]*)/i)?.[1]?.toLowerCase() || null
 }
 
 async function submit() {
   const text = getPromptText()
   if (!text || state.running.value) return
+  const requestedAgentId = inferPersona(text) || activeAgentId.value
+  activeAgentId.value = requestedAgentId
 
   error.value = ''
   gatewayConfigError.value = false
@@ -925,7 +1004,7 @@ async function submit() {
       source_doctype: props.referenceDoctype,
       source_name: props.referenceName,
       surface: props.surface,
-      persona: inferPersona(text) || undefined,
+      persona: requestedAgentId || undefined,
       session_key: sessionKey,
       payload: {
         attachments: attachments.value.map((file) => ({
@@ -940,7 +1019,7 @@ async function submit() {
     if (isGatewayConfigError(err)) {
       gatewayConfigError.value = true
     } else {
-      error.value = err?.messages?.[0] || err?.message || 'Could not start NextAI run.'
+      error.value = err?.messages?.[0] || err?.message || 'Could not start the Muster run.'
       toast.error(error.value)
       // Reflect the failure as a system bubble so the thread doesn't
       // silently swallow the failed turn.
@@ -1059,7 +1138,7 @@ function textToHtml(text: string): string {
 }
 
 function renderMessageHtml(value: string): string {
-  const escaped = escapeHtml(value || '')
+  const escaped = escapeHtml(publicMessage(value))
   const withMarkdownLinks = escaped.replace(
     /\[([^\]]+)\]\((\/files\/[^)\s]+|https?:\/\/[^)\s]+)\)/g,
     (_match, label, href) =>
@@ -1071,6 +1150,16 @@ function renderMessageHtml(value: string): string {
       `${prefix}<a href="${href}" target="_blank" rel="noopener" class="oc-message-link">${href}</a>`,
   )
   return withBarePublicFiles.replace(/\n/g, '<br>')
+}
+
+function publicMessage(value: string): string {
+  return String(value || '')
+    .replace(
+      /OpenClaw gateway(?: stream)? at \S+ exceeded (\d+)s wall-clock budget\.?/gi,
+      'The agent run timed out after $1 seconds. Try again or check the site connection.',
+    )
+    .replace(/OpenClaw/gi, 'Muster')
+    .replace(/NextAI/gi, 'Muster')
 }
 
 function humanize(name: string): string {
@@ -1102,8 +1191,9 @@ watch(
 
 <style scoped>
 .oc-prompt-editor {
-  padding: 0.5rem 0.5rem;
+  padding: 0.75rem 0.75rem 0.5rem;
   outline: none;
+  line-height: 1.5rem;
 }
 .oc-prompt-editor :deep(.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
@@ -1125,10 +1215,58 @@ watch(
   display: inline;
 }
 .oc-thread {
-  /* Chat thread keeps the prompt input reachable on small drawers. */
-  max-height: 50vh;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+.oc-composer-shell {
+  flex: 0 0 auto;
+}
+.oc-composer-frame {
+  overflow: hidden;
+  border: 1px solid var(--surface-gray-4, #d1d5db);
+  border-radius: 8px;
+  background: var(--surface-white, #ffffff);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.oc-composer-frame:focus-within {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
+}
+.oc-composer-toolbar {
+  border-color: var(--surface-gray-2, #f3f4f6);
+}
+.oc-icon-button,
+.oc-send-button {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+.oc-icon-button {
+  color: var(--ink-gray-6, #4b5563);
+}
+.oc-icon-button:hover:not(:disabled) {
+  background: var(--surface-gray-2, #f3f4f6);
+  color: var(--ink-gray-9, #111827);
+}
+.oc-send-button {
+  background: #0f766e;
+  color: #ffffff;
+}
+.oc-send-button:hover:not(:disabled) {
+  background: #115e59;
+}
+.oc-icon-button:disabled,
+.oc-send-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 .oc-user-bubble {
   background: #111827;
@@ -1179,9 +1317,28 @@ watch(
 .oc-drawer-header {
   flex: 0 0 auto;
 }
-.oc-drawer-body {
+.oc-assistant-body {
   flex: 1 1 auto;
   min-height: 0;
+}
+.oc-workspace-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface-white, #ffffff);
+  border: 1px solid var(--surface-gray-3, #e5e7eb);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.oc-empty-state {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 12rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 @media (max-width: 640px) {
   .oc-drawer-shell {

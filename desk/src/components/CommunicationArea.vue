@@ -28,7 +28,7 @@
         <Button
           v-if="showEmailBox"
           variant="subtle"
-          label="Draft with NextAI"
+          label="Draft with Muster"
           :loading="emailGhostLoading"
           @click="generateInlineDraft('reply')"
         >
@@ -39,7 +39,7 @@
         <Button
           v-if="showCommentBox"
           variant="subtle"
-          label="Draft with NextAI"
+          label="Draft with Muster"
           :loading="commentGhostLoading"
           @click="generateInlineDraft('comment')"
         >
