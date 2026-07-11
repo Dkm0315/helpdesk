@@ -21,7 +21,7 @@
               <span class="h-2 w-2 animate-bounce rounded-full bg-ink-gray-4 [animation-delay:120ms]" />
               <span class="h-2 w-2 animate-bounce rounded-full bg-ink-gray-4 [animation-delay:240ms]" />
             </div>
-            NextAI is drafting the handoff template from the ticket context...
+            Muster is drafting the handoff template from the ticket context...
           </div>
         </div>
 

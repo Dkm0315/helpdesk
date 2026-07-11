@@ -17,7 +17,7 @@ export const agentPortalSidebarOptions = [
     to: "TicketsAgent",
   },
   {
-    label: __("NextAI"),
+    label: __("Muster"),
     icon: LucideSparkles,
     to: "NextAIWorkspace",
   },

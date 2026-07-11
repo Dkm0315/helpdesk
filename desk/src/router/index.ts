@@ -67,7 +67,8 @@ const routes = [
     meta: { auth: true },
   },
   {
-    path: "/nextai",
+    path: "/muster",
+    alias: ["/nextai"],
     name: "NextAIWorkspace",
     component: () => import("@/pages/openclaw/AIWorkspace.vue"),
   },

@@ -55,7 +55,7 @@
     <OpenClawLauncher
       v-if="!isCustomerPortal"
       :hidden="aiDrawerOpen"
-      tooltip="Ask NextAI"
+      tooltip="Ask Muster"
       @toggle="aiDrawerOpen = !aiDrawerOpen"
     />
     <NextAIPanel

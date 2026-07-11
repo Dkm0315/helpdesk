@@ -45,7 +45,7 @@
               class="h-3 w-3"
               :class="ghostLoading ? 'animate-pulse' : ''"
             />
-            <template v-if="ghostLoading">NextAI is drafting...</template>
+            <template v-if="ghostLoading">Muster is drafting...</template>
             <template v-else>
               <kbd class="rounded border bg-white px-1 py-0.5 text-[10px] text-ink-gray-7">Tab</kbd>
               to accept ·
@@ -95,7 +95,7 @@
               <template #icon>
                 <Sparkles class="h-4 w-4" />
               </template>
-              Draft with NextAI
+              Draft with Muster
             </Button>
           </div>
           <div class="flex items-center justify-end space-x-2 w-[40%]">

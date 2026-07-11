@@ -20,7 +20,7 @@
          while the drawer is open so the corner stays uncluttered. -->
     <OpenClawLauncher
       :hidden="aiDrawerOpen"
-      tooltip="Ask NextAI"
+      tooltip="Ask Muster"
       @toggle="toggleAIDrawer"
     />
     <SendToGameplanModal
