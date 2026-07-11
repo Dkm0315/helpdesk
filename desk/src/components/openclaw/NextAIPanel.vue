@@ -846,6 +846,8 @@ function normalizeCommands(commands: any): SuggestionItem[] {
 function commandGroup(command: any): string {
   if (command?.primary) return 'This page'
   const source = String(command?.source || '')
+  if (source.includes('muster_builtin')) return 'Muster controls'
+  if (source.includes('muster_custom')) return 'Configured workflows'
   if (source.includes('codex') || source.includes('gateway') || source.includes('tool')) {
     return 'Muster tools'
   }
@@ -1052,12 +1054,10 @@ async function submit() {
     draft &&
     !['runtime_pending', 'local_gateway_placeholder'].includes(runResp?.proposal?.mode || '')
   ) {
-    const idx = lastStreamingAssistantIndex()
-    if (idx >= 0) {
-      messages.value[idx].content =
-        typeof draft === 'string' ? draft : JSON.stringify(draft, null, 2)
-      messages.value[idx].status = 'done'
-    }
+    const idx = ensureStreamingAssistant()
+    messages.value[idx].content =
+      typeof draft === 'string' ? draft : JSON.stringify(draft, null, 2)
+    messages.value[idx].status = 'done'
     state.thinkingLine.value = 'Ready for review.'
     clearPrompt()
     scrollThreadToBottom()
