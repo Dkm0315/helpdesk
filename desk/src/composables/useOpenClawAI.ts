@@ -33,6 +33,7 @@ export type StreamToolCall = {
 
 export type StreamState = {
   thinkingLine: Ref<string>;
+  reasoningText: Ref<string>;
   tokens: Ref<string[]>;
   fullText: ComputedRef<string>;
   toolCalls: Ref<StreamToolCall[]>;
@@ -171,6 +172,7 @@ export function rememberSessionKey(doctype: string | undefined, name: string | u
  */
 export function useStreamingRun(): StreamingRunHandle {
   const thinkingLine = ref<string>("");
+  const reasoningText = ref<string>("");
   const tokens = ref<string[]>([]);
   const toolCalls = ref<StreamToolCall[]>([]);
   const running = ref<boolean>(false);
@@ -188,6 +190,10 @@ export function useStreamingRun(): StreamingRunHandle {
   let currentRunName = "";
   let startedAt = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let statusPollTimer: ReturnType<typeof setTimeout> | undefined;
+  let statusPollInFlight = false;
+  let statusPollFailures = 0;
+  let providerActivitySeen = false;
 
   // Return true iff the event payload targets the run we're currently
   // streaming. Foreign-run events are silently dropped.
@@ -201,22 +207,51 @@ export function useStreamingRun(): StreamingRunHandle {
     return String(payload.run) === currentRunName;
   }
 
+  function mergeCumulative(current: string, incoming: string): string {
+    if (!incoming) return current;
+    if (!current || incoming.startsWith(current)) return incoming;
+    if (current.startsWith(incoming)) return current;
+    return incoming.length >= current.length ? incoming : current;
+  }
+
   function onProgress(payload: any) {
+    if (!running.value) return;
     if (!payload) return;
     if (!isForCurrentRun(payload)) return;
     thinkingLine.value = payload.label || thinkingLine.value;
+    if (payload.label) providerActivitySeen = true;
     phase.value = payload.phase || phase.value;
     lastEventAt.value = Date.now();
   }
 
   function onDelta(payload: any) {
+    if (!running.value) return;
     if (!payload || typeof payload.token !== "string") return;
     if (!isForCurrentRun(payload)) return;
-    tokens.value.push(payload.token);
+    if (typeof payload.text === "string") {
+      tokens.value = [mergeCumulative(tokens.value.join(""), payload.text)];
+    }
+    else tokens.value.push(payload.token);
+    providerActivitySeen = true;
+    lastEventAt.value = Date.now();
+  }
+
+  function onReasoning(payload: any) {
+    if (!running.value) return;
+    if (!payload || !isForCurrentRun(payload)) return;
+    if (typeof payload.text === "string") {
+      reasoningText.value = mergeCumulative(reasoningText.value, payload.text);
+    }
+    else if (typeof payload.token === "string") reasoningText.value += payload.token;
+    else return;
+    thinkingLine.value = reasoningText.value;
+    providerActivitySeen = true;
+    phase.value = "provider.reasoning";
     lastEventAt.value = Date.now();
   }
 
   function onTool(payload: any) {
+    if (!running.value) return;
     if (!payload || !payload.name) return;
     if (!isForCurrentRun(payload)) return;
     const id = `${payload.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -228,7 +263,8 @@ export function useStreamingRun(): StreamingRunHandle {
         args: payload.args,
         startedAt: Date.now(),
       });
-      thinkingLine.value = `Calling ${humanize(payload.name)}...`;
+      thinkingLine.value = humanize(payload.name);
+      providerActivitySeen = true;
     } else if (payload.status === "done") {
       const idx = [...toolCalls.value]
         .reverse()
@@ -252,33 +288,126 @@ export function useStreamingRun(): StreamingRunHandle {
   }
 
   function onDone(payload: any) {
+    if (!running.value) return;
     if (!isForCurrentRun(payload)) return;
     finalText.value = (payload && payload.final) || tokens.value.join("");
     running.value = false;
-    thinkingLine.value = "Ready for review.";
+    thinkingLine.value = "";
     phase.value = "done";
     lastEventAt.value = Date.now();
     stopTimer();
+    stopStatusPolling();
+    unbind();
+    currentRunName = "";
   }
 
   function onError(payload: any) {
+    if (!running.value) return;
     if (!isForCurrentRun(payload)) return;
     error.value = (payload && payload.message) || "Streaming error";
     running.value = false;
     stopTimer();
+    stopStatusPolling();
+    unbind();
+    currentRunName = "";
   }
 
   function onStopped(payload: any) {
+    if (!running.value) return;
     if (!isForCurrentRun(payload)) return;
     running.value = false;
-    thinkingLine.value = "Stopped.";
+    thinkingLine.value = "";
     phase.value = "stopped";
+    error.value = (payload && payload.message) || "Run stopped before a result was produced.";
     stopTimer();
+    stopStatusPolling();
+    unbind();
+    currentRunName = "";
+  }
+
+  function applyRunStatus(payload: any) {
+    if (!payload || !isForCurrentRun({ run: payload.name })) return;
+    const status = String(payload.status || "").trim().toLowerCase();
+    const progress = String(payload.progress_state || "").trim();
+    const providerText = typeof payload.provider_text === "string" ? payload.provider_text : "";
+    const providerReasoning = typeof payload.reasoning_text === "string" ? payload.reasoning_text : "";
+    if (providerText) {
+      tokens.value = [mergeCumulative(tokens.value.join(""), providerText)];
+      providerActivitySeen = true;
+    }
+    if (providerReasoning) {
+      reasoningText.value = mergeCumulative(reasoningText.value, providerReasoning);
+      thinkingLine.value = reasoningText.value;
+      providerActivitySeen = true;
+      phase.value = "provider.reasoning";
+    }
+    if (status === "ready" || status === "applied") {
+      const final = String(payload.final_text || "").trim();
+      if (final) onDone({ run: currentRunName, final });
+      else onError({ run: currentRunName, message: "The run finished without a visible response. Refresh the chat and retry delivery." });
+      return;
+    }
+    if (status === "failed") {
+      onError({
+        run: currentRunName,
+        message: payload.error_message || payload.error || "The run failed without an error message.",
+      });
+      return;
+    }
+    if (status === "cancelled") {
+      onStopped({ run: currentRunName, message: payload.error_message || "Run stopped before a result was produced." });
+      return;
+    }
+    if (["queued", "running", "needs input"].includes(status)) {
+      if (!providerReasoning && progress === "Finalizing") thinkingLine.value = "Attaching files";
+      if (!providerReasoning && progress === "Delivery retry pending") thinkingLine.value = "Retrying file attachment";
+      phase.value = progress ? `status.${progress.toLowerCase().replaceAll(" ", "_")}` : phase.value;
+      lastEventAt.value = Date.now();
+    }
+  }
+
+  async function pollStatus() {
+    statusPollTimer = undefined;
+    if (!running.value || !currentRunName || statusPollInFlight) return;
+    const runName = currentRunName;
+    statusPollInFlight = true;
+    try {
+      const payload = await getAIRunStatus(runName);
+      if (runName !== currentRunName || !running.value) return;
+      statusPollFailures = 0;
+      applyRunStatus(payload);
+    } catch {
+      statusPollFailures += 1;
+      if (statusPollFailures >= 3 && running.value) {
+        thinkingLine.value = "Reconnecting";
+        phase.value = "status.reconnecting";
+      }
+    } finally {
+      statusPollInFlight = false;
+      if (running.value && runName === currentRunName) {
+        scheduleStatusPoll(elapsedSec.value < 30 ? 3000 : 5000);
+      }
+    }
+  }
+
+  function scheduleStatusPoll(delayMs = 1000) {
+    if (statusPollTimer || !running.value || !currentRunName) return;
+    statusPollTimer = setTimeout(() => void pollStatus(), delayMs);
+  }
+
+  function stopStatusPolling() {
+    if (statusPollTimer) {
+      clearTimeout(statusPollTimer);
+      statusPollTimer = undefined;
+    }
+    statusPollInFlight = false;
+    statusPollFailures = 0;
   }
 
   function bind() {
     socket.on("openclaw_progress", onProgress);
     socket.on("openclaw_delta", onDelta);
+    socket.on("openclaw_reasoning", onReasoning);
     socket.on("openclaw_tool", onTool);
     socket.on("openclaw_done", onDone);
     socket.on("openclaw_error", onError);
@@ -288,6 +417,7 @@ export function useStreamingRun(): StreamingRunHandle {
   function unbind() {
     socket.off("openclaw_progress", onProgress);
     socket.off("openclaw_delta", onDelta);
+    socket.off("openclaw_reasoning", onReasoning);
     socket.off("openclaw_tool", onTool);
     socket.off("openclaw_done", onDone);
     socket.off("openclaw_error", onError);
@@ -302,9 +432,8 @@ export function useStreamingRun(): StreamingRunHandle {
     timer = setInterval(() => {
       if (!running.value) return;
       elapsedSec.value = Math.floor((Date.now() - startedAt) / 1000);
-      const silenceSec = (Date.now() - lastEventAt.value) / 1000;
-      if (elapsedSec.value > 5 && silenceSec > 3 && phase.value !== "done") {
-        thinkingLine.value = `Still working - ${elapsedSec.value}s elapsed...`;
+      if (!providerActivitySeen && phase.value !== "done") {
+        thinkingLine.value = `${elapsedSec.value}s`;
       }
     }, 1000);
   }
@@ -318,6 +447,7 @@ export function useStreamingRun(): StreamingRunHandle {
 
   function reset() {
     thinkingLine.value = "";
+    reasoningText.value = "";
     tokens.value = [];
     toolCalls.value = [];
     running.value = false;
@@ -326,6 +456,7 @@ export function useStreamingRun(): StreamingRunHandle {
     finalText.value = "";
     lastEventAt.value = 0;
     phase.value = "";
+    providerActivitySeen = false;
   }
 
   function start(runName: string) {
@@ -339,9 +470,10 @@ export function useStreamingRun(): StreamingRunHandle {
     // rely on per-user delivery from `frappe.publish_realtime(user=...)`
     // and filter by `payload.run` inside each handler above.
     running.value = true;
-    thinkingLine.value = "Opening session...";
+    thinkingLine.value = "";
     phase.value = "session.opened";
     startTimer();
+    scheduleStatusPoll();
   }
 
   async function stop(runName: string) {
@@ -374,6 +506,7 @@ export function useStreamingRun(): StreamingRunHandle {
     currentRunName = "";
     unbind();
     stopTimer();
+    stopStatusPolling();
     running.value = false;
   }
 
@@ -382,6 +515,7 @@ export function useStreamingRun(): StreamingRunHandle {
   return {
     state: {
       thinkingLine,
+      reasoningText,
       tokens,
       fullText,
       toolCalls,

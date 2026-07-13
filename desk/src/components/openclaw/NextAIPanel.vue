@@ -155,6 +155,14 @@
               <span v-else v-html="renderMessageHtml(msg.content)" />
             </div>
 
+            <details
+              v-if="msg.status === 'done' && msg.reasoning"
+              class="max-w-[90%] rounded-lg border bg-surface-gray-1 px-3 py-2 text-xs text-ink-gray-7"
+            >
+              <summary class="cursor-pointer select-none font-medium text-ink-gray-7">Process</summary>
+              <div class="mt-2 whitespace-pre-wrap leading-5 text-ink-gray-6">{{ msg.reasoning }}</div>
+            </details>
+
             <!-- Live status row attached to the ACTIVE assistant bubble -->
             <template v-if="msg.status === 'streaming' && isLastAssistant(idx)">
               <div class="flex items-center gap-2 text-xs text-ink-gray-6 pl-1">
@@ -163,7 +171,7 @@
                   <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-gray-4 [animation-delay:120ms]" />
                   <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-gray-4 [animation-delay:240ms]" />
                 </span>
-                <span>{{ state.thinkingLine.value || 'Working...' }}</span>
+                <span class="line-clamp-2">{{ liveActivityLabel }}</span>
                 <span v-if="state.elapsedSec.value > 5" class="text-ink-gray-5">({{ state.elapsedSec.value }}s)</span>
               </div>
 
@@ -216,7 +224,7 @@
               <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-gray-4 [animation-delay:120ms]" />
               <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-gray-4 [animation-delay:240ms]" />
             </span>
-            <span>{{ state.thinkingLine.value || 'Working...' }}</span>
+            <span class="line-clamp-2">{{ liveActivityLabel }}</span>
             <span v-if="state.elapsedSec.value > 5" class="text-ink-gray-5">({{ state.elapsedSec.value }}s)</span>
           </div>
           <div v-if="state.toolCalls.value.length" class="flex flex-wrap gap-1.5 pl-1">
@@ -461,6 +469,13 @@ const steerText = ref('')
 const modifyText = ref('')
 
 const { state, start, stop, steer, modify, cleanup } = useStreamingRun()
+const liveActivityLabel = computed(() => {
+  const raw = String(state.reasoningText.value || state.thinkingLine.value || '').trim()
+  if (!raw || /^\d+s$/.test(raw)) return 'Starting'
+  const segments = raw.split(/\n+|(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean)
+  const latest = segments.at(-1) || raw
+  return latest.length > 180 ? `${latest.slice(0, 177)}...` : latest
+})
 const isWorkspace = computed(() => props.layout === 'workspace')
 const canInsert = computed(() => !isWorkspace.value && Boolean(props.getParentEditor || props.onInsert))
 const selectedAgentId = computed(() => inferPersona(promptText.value) || activeAgentId.value)
@@ -590,6 +605,7 @@ type ChatMessage = {
   status?: 'streaming' | 'done' | 'error'
   runName?: string
   presentation?: any
+  reasoning?: string
 }
 
 const messages = ref<ChatMessage[]>([])
@@ -615,6 +631,8 @@ function isLastAssistant(idx: number): boolean {
 
 const pendingRunName = ref<string>('')
 const queuedCommand = ref<string>('')
+let catalogRequestId = 0
+let historyRequestId = 0
 
 const hasStreamingAssistant = computed(() =>
   messages.value.some(m => m.role === 'assistant' && m.status === 'streaming'),
@@ -639,10 +657,12 @@ function scrollThreadToBottom() {
 function clearConversation() {
   cleanup()
   currentRun.value = ''
+  pendingRunName.value = ''
   error.value = ''
   state.tokens.value = []
   state.finalText.value = ''
   state.thinkingLine.value = ''
+  state.reasoningText.value = ''
   state.toolCalls.value = []
   state.elapsedSec.value = 0
   state.error.value = ''
@@ -670,11 +690,11 @@ function ensureStreamingAssistant(): number {
 }
 
 watch(
-  () => state.tokens.value.length,
-  () => {
-    if (!state.tokens.value.length) return
+  () => state.tokens.value.join(''),
+  (value) => {
+    if (!value) return
     const idx = ensureStreamingAssistant()
-    messages.value[idx].content = state.tokens.value.join('')
+    messages.value[idx].content = value
     scrollThreadToBottom()
   },
 )
@@ -686,7 +706,17 @@ watch(
     const idx = ensureStreamingAssistant()
     messages.value[idx].content = v
     messages.value[idx].status = 'done'
+    messages.value[idx].reasoning = state.reasoningText.value || undefined
     scrollThreadToBottom()
+  },
+)
+
+watch(
+  () => state.reasoningText.value,
+  (value) => {
+    if (!value) return
+    const idx = lastStreamingAssistantIndex()
+    if (idx >= 0) messages.value[idx].reasoning = value
   },
 )
 
@@ -717,7 +747,11 @@ watch(
 watch(
   () => [props.open, props.referenceDoctype, props.referenceName, props.surface],
   ([isOpen, newDt, newName, newSurface], [_oldOpen, oldDt, oldName, oldSurface]) => {
-    if (!isOpen) return
+    if (!isOpen) {
+      catalogRequestId += 1
+      historyRequestId += 1
+      return
+    }
     if (newDt !== oldDt || newName !== oldName || newSurface !== oldSurface) {
       clearConversation()
     }
@@ -1069,14 +1103,19 @@ function personaGroup(persona: any): string {
 }
 
 async function loadCatalog() {
+  const requestId = ++catalogRequestId
+  const sourceDoctype = props.referenceDoctype
+  const sourceName = props.referenceName
+  const surface = props.surface
   catalogLoading.value = true
   catalogError.value = ''
   try {
     const result = await getCommandCatalog({
-      source_doctype: props.referenceDoctype,
-      source_name: props.referenceName,
-      surface: props.surface,
+      source_doctype: sourceDoctype,
+      source_name: sourceName,
+      surface,
     })
+    if (!isCurrentPanelRequest(requestId, catalogRequestId, sourceDoctype, sourceName, surface)) return
     catalog.value = result
     if (!controlGroupTouched.value) {
       activeControlGroup.value = result?.personas?.['oss-manager-tester']
@@ -1086,29 +1125,35 @@ async function loadCatalog() {
           : 'personal'
     }
   } catch (err: any) {
+    if (!isCurrentPanelRequest(requestId, catalogRequestId, sourceDoctype, sourceName, surface)) return
     catalog.value = null
     catalogError.value = err?.messages?.[0] || err?.message || 'Could not load commands.'
     if (isGatewayConfigError(err)) {
       gatewayConfigError.value = true
     }
   } finally {
-    catalogLoading.value = false
+    if (requestId === catalogRequestId) catalogLoading.value = false
   }
 }
 
 async function loadHistory() {
   if (!props.open) return
-  const sessionKey = getStoredSessionKey(props.referenceDoctype, props.referenceName)
+  const requestId = ++historyRequestId
+  const sourceDoctype = props.referenceDoctype
+  const sourceName = props.referenceName
+  const surface = props.surface
+  const sessionKey = getStoredSessionKey(sourceDoctype, sourceName)
   try {
     const result: any = await getRunHistory({
-      source_doctype: props.referenceDoctype,
-      source_name: props.referenceName,
-      surface: props.surface,
+      source_doctype: sourceDoctype,
+      source_name: sourceName,
+      surface,
       session_key: sessionKey,
       limit: 12,
     })
+    if (!isCurrentPanelRequest(requestId, historyRequestId, sourceDoctype, sourceName, surface)) return
     if (result?.session_key) {
-      rememberSessionKey(props.referenceDoctype, props.referenceName, result.session_key)
+      rememberSessionKey(sourceDoctype, sourceName, result.session_key)
     }
     const restored: ChatMessage[] = []
     for (const turn of result?.turns || []) {
@@ -1139,9 +1184,31 @@ async function loadHistory() {
         .find((turn: any) => turn?.persona)?.persona || null
       scrollThreadToBottom()
     }
+    const activeTurn = [...(result?.turns || [])]
+      .reverse()
+      .find((turn: any) => ['queued', 'running', 'needs input'].includes(String(turn?.status || '').toLowerCase()))
+    if (activeTurn?.run && !state.running.value && currentRun.value !== activeTurn.run) {
+      pendingRunName.value = activeTurn.run
+      currentRun.value = activeTurn.run
+      start(activeTurn.run)
+    }
   } catch {
     // Existing chat should remain usable even if old history cannot load.
   }
+}
+
+function isCurrentPanelRequest(
+  requestId: number,
+  latestRequestId: number,
+  sourceDoctype: string | undefined,
+  sourceName: string | undefined,
+  surface: string | undefined,
+): boolean {
+  return requestId === latestRequestId
+    && props.open
+    && props.referenceDoctype === sourceDoctype
+    && props.referenceName === sourceName
+    && props.surface === surface
 }
 
 function isGatewayConfigError(err: any): boolean {
@@ -1160,6 +1227,7 @@ function discardOutput() {
   state.tokens.value = []
   state.finalText.value = ''
   state.thinkingLine.value = ''
+  state.reasoningText.value = ''
   state.toolCalls.value = []
   state.elapsedSec.value = 0
   state.error.value = ''
@@ -1195,6 +1263,7 @@ async function submit() {
   gatewayConfigError.value = false
   state.tokens.value = []
   state.finalText.value = ''
+  state.reasoningText.value = ''
   state.toolCalls.value = []
 
   // 1. Push the user message into the visible thread.
@@ -1268,7 +1337,7 @@ async function submit() {
       typeof draft === 'string' ? draft : JSON.stringify(draft, null, 2)
     messages.value[idx].status = 'done'
     messages.value[idx].presentation = runResp?.proposal?.presentation || undefined
-    state.thinkingLine.value = 'Ready for review.'
+    state.thinkingLine.value = ''
     clearPrompt()
     scrollThreadToBottom()
     return
@@ -1375,12 +1444,12 @@ function textToHtml(text: string): string {
 function renderMessageHtml(value: string): string {
   const escaped = escapeHtml(publicMessage(value))
   const withMarkdownLinks = escaped.replace(
-    /\[([^\]]+)\]\((\/files\/[^)\s]+|https?:\/\/[^)\s]+)\)/g,
+    /\[([^\]]+)\]\((\/(?:private\/)?files\/[^)\s]+|https?:\/\/[^)\s]+)\)/g,
     (_match, label, href) =>
       `<a href="${href}" target="_blank" rel="noopener" class="oc-message-link">${label}</a>`,
   )
   const withBarePublicFiles = withMarkdownLinks.replace(
-    /(^|[\s(])(\/files\/[^\s)<]+)/g,
+    /(^|[\s(])(\/(?:private\/)?files\/[^\s)<]+)/g,
     (_match, prefix, href) =>
       `${prefix}<a href="${href}" target="_blank" rel="noopener" class="oc-message-link">${href}</a>`,
   )
