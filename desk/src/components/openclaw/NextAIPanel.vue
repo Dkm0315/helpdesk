@@ -72,9 +72,23 @@
             <div class="text-xs font-semibold text-ink-gray-8">Muster controls</div>
             <div class="truncate text-[11px] text-ink-gray-5">{{ controlCenterSummary }}</div>
           </div>
-          <span class="oc-access-badge">{{ accessTierLabel }}</span>
+          <div class="flex shrink-0 items-center gap-1.5">
+            <span class="oc-access-badge">{{ accessTierLabel }}</span>
+            <button
+              type="button"
+              class="oc-control-toggle"
+              :aria-expanded="controlsExpanded"
+              :aria-label="controlsExpanded ? 'Hide Muster controls' : 'Show Muster controls'"
+              :title="controlsExpanded ? 'Hide controls' : 'Show controls'"
+              @click="toggleControls"
+            >
+              <LucideChevronUp v-if="controlsExpanded" class="h-3.5 w-3.5" aria-hidden="true" />
+              <LucideChevronDown v-else class="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{{ controlsExpanded ? 'Hide' : 'Show' }}</span>
+            </button>
+          </div>
         </div>
-        <div class="oc-control-tabs" role="tablist" aria-label="Control group">
+        <div v-if="controlsExpanded" class="oc-control-tabs" role="tablist" aria-label="Control group">
           <button
             v-for="tab in controlTabs"
             :key="tab.id"
@@ -89,7 +103,7 @@
             <small>{{ tab.actions.length }}</small>
           </button>
         </div>
-        <div class="oc-control-actions" role="tabpanel">
+        <div v-if="controlsExpanded" class="oc-control-actions" role="tabpanel">
           <button
             v-for="action in activeControlActions"
             :key="action.token"
@@ -410,6 +424,8 @@ import LucideUserRound from '~icons/lucide/user-round'
 import LucideShieldCheck from '~icons/lucide/shield-check'
 import LucideWorkflow from '~icons/lucide/workflow'
 import LucideBoxes from '~icons/lucide/boxes'
+import LucideChevronDown from '~icons/lucide/chevron-down'
+import LucideChevronUp from '~icons/lucide/chevron-up'
 import NextAISuggestionList, { type SuggestionItem } from './NextAISuggestionList.vue'
 import NextAIPresentation from './NextAIPresentation.vue'
 import {
@@ -489,6 +505,8 @@ type ControlTab = {
 }
 const activeControlGroup = ref<ControlGroupId>('personal')
 const controlGroupTouched = ref(false)
+const controlsExpanded = ref(true)
+const CONTROLS_EXPANDED_KEY = 'muster:workspace-controls-expanded'
 const controlGroupDefinitions: Array<Omit<ControlTab, 'actions'>> = [
   {
     id: 'oss-manager',
@@ -498,6 +516,7 @@ const controlGroupDefinitions: Array<Omit<ControlTab, 'actions'>> = [
       'oss-overview', 'solution-design', 'ticket-brief', 'reply-draft', 'delivery-plan',
       'change-scan', 'test-plan', 'validate', 'validation-status', 'release-evidence',
       'documentation-status', 'documentation-impact', 'documentation-update', 'runbooks',
+      'jenkins', 'builds', 'jenkins-scripts', 'pipeline',
     ],
   },
   {
@@ -578,6 +597,15 @@ const quickActions = computed(() => {
 function selectControlGroup(group: ControlGroupId) {
   controlGroupTouched.value = true
   activeControlGroup.value = group
+}
+
+function toggleControls() {
+  controlsExpanded.value = !controlsExpanded.value
+  try {
+    localStorage.setItem(CONTROLS_EXPANDED_KEY, controlsExpanded.value ? '1' : '0')
+  } catch {
+    // Storage can be unavailable in hardened browsers; the toggle still works for this session.
+  }
 }
 const suggestionEmptyLabel = computed(() => {
   if (catalogError.value) return 'Commands are temporarily unavailable'
@@ -870,6 +898,11 @@ function onDocumentPointerDown(event: PointerEvent) {
 }
 
 onMounted(() => {
+  try {
+    controlsExpanded.value = localStorage.getItem(CONTROLS_EXPANDED_KEY) !== '0'
+  } catch {
+    controlsExpanded.value = true
+  }
   initEditor()
   loadCatalog()
   loadHistory()
@@ -1679,6 +1712,26 @@ watch(
   color: #115e59;
   font-size: 0.65rem;
   font-weight: 650;
+}
+.oc-control-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--surface-gray-3, #e5e7eb);
+  border-radius: 6px;
+  padding: 0.22rem 0.42rem;
+  color: var(--ink-gray-6, #4b5563);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+.oc-control-toggle:hover {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #115e59;
+}
+.oc-control-toggle:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
 }
 .oc-control-tabs {
   display: flex;
